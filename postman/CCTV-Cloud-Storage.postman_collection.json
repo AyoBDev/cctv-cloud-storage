@@ -1,0 +1,714 @@
+{
+  "info": {
+    "_postman_id": "cctv-cloud-storage-v1",
+    "name": "CCTV Cloud Storage API",
+    "description": "# CCTV Cloud Storage API\n\nMulti-tenant SaaS platform for CCTV management with face recognition.\n\n## Authentication\n\nAll protected endpoints require a **Bearer token** in the `Authorization` header:\n```\nAuthorization: Bearer <accessToken>\n```\n\nAccess tokens expire in **15 minutes**. Use `POST /api/v1/admin/auth/refresh` to obtain a new pair before expiry. Refresh tokens expire in **7 days** and are **single-use** (rotated on every refresh).\n\n## Error Shape\n\nAll errors follow a consistent envelope:\n```json\n{\n  \"error\": {\n    \"code\": \"ERROR_CODE\",\n    \"message\": \"Human-readable description\"\n  }\n}\n```\n\n### Error Codes\n| Code | HTTP | Description |\n|------|------|-------------|\n| `INVALID_CREDENTIALS` | 401 | Wrong email or password |\n| `TOKEN_INVALID` | 401 | Malformed or unverifiable token |\n| `TOKEN_EXPIRED` | 401 | Token past its expiry |\n| `TOKEN_REVOKED` | 401 | Refresh token already used or logged out |\n| `UNAUTHORIZED` | 401 | Missing or invalid access token |\n| `FORBIDDEN` | 403 | Authenticated but insufficient role |\n| `VALIDATION_ERROR` | 400 | Request body/params failed schema validation |\n| `NOT_FOUND` | 404 | Resource or route not found |\n| `CONFLICT` | 409 | Duplicate resource |\n| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests (100 req/min per IP) |\n| `INTERNAL_ERROR` | 500 | Unexpected server error |\n\n## Rate Limiting\n\n100 requests per minute per IP. Health check allows 300/min. Response headers:\n- `x-ratelimit-limit` — limit\n- `x-ratelimit-remaining` — remaining in window\n- `x-ratelimit-reset` — seconds until reset\n\n## Environments\n\nUse the companion environment file `CCTV-Cloud-Storage.postman_environment.json`. Switch between `local`, `staging`, and `production` by changing the `baseUrl` variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Override with environment variable. Set to your API base URL."
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the Login request test script."
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the Login and Refresh requests."
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level pre-request: nothing needed globally"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level test: validate error shape whenever status >= 400",
+          "if (pm.response.code >= 400) {",
+          "    const body = pm.response.json();",
+          "    pm.test('Error response has correct envelope', () => {",
+          "        pm.expect(body).to.have.property('error');",
+          "        pm.expect(body.error).to.have.property('code');",
+          "        pm.expect(body.error).to.have.property('message');",
+          "        pm.expect(body.error.code).to.be.a('string');",
+          "        pm.expect(body.error.message).to.be.a('string');",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "System health check. No authentication required. Verifies PostgreSQL and Redis connectivity.",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Returns the operational status of the API and its dependencies.\n\n**No authentication required.**\n\n### Response\n```json\n{\n  \"status\": \"ok\",\n  \"db\": \"ok\",\n  \"redis\": \"ok\"\n}\n```\n\n`status` is `\"ok\"` only when both `db` and `redis` are `\"ok\"`. Otherwise `\"degraded\"`.\n\n### Rate Limit\n300 requests per minute (higher than default)."
+          },
+          "response": [
+            {
+              "name": "200 OK — All services healthy",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"db\": \"ok\",\n  \"redis\": \"ok\"\n}"
+            },
+            {
+              "name": "200 OK — Degraded (DB or Redis down)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": "{\n  \"status\": \"degraded\",\n  \"db\": \"error\",\n  \"redis\": \"ok\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has expected shape', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status');",
+                  "    pm.expect(body).to.have.property('db');",
+                  "    pm.expect(body).to.have.property('redis');",
+                  "    pm.expect(body.status).to.be.oneOf(['ok', 'degraded']);",
+                  "    pm.expect(body.db).to.be.oneOf(['ok', 'error']);",
+                  "    pm.expect(body.redis).to.be.oneOf(['ok', 'error']);",
+                  "});",
+                  "",
+                  "pm.test('Response time < 500ms', () => {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin / Auth",
+      "description": "Super Admin authentication. These routes manage the lifecycle of RS256 JWT tokens.\n\n- **Login** — exchange credentials for a token pair\n- **Refresh** — rotate the refresh token and get a new access token (single-use, revocation via Redis)\n- **Logout** — revoke the refresh token (requires a valid access token)",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "login"]
+            },
+            "description": "Authenticates a Super Admin and returns an RS256 JWT access/refresh token pair.\n\n**No authentication required.**\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `email` | string | ✓ | Valid email format |\n| `password` | string | ✓ | Minimum 8 characters |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiJ9...\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiJ9...\"\n}\n```\n\n| Token | Algorithm | Expiry | Storage recommendation |\n|-------|-----------|--------|-----------------------|\n| `accessToken` | RS256 | 15 min | Memory only (not localStorage) |\n| `refreshToken` | RS256 | 7 days | HttpOnly cookie or secure storage |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid email format or password < 8 chars |\n| 401 | `INVALID_CREDENTIALS` | Email not found or password incorrect |\n| 403 | `FORBIDDEN` | Account is deactivated |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Token pair issued",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@cctv-cloud.local\",\n  \"password\": \"changeme123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "login"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJvcmdfaWQiOm51bGwsImp0aSI6ImFiYzEyMyIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3MzE0MTYwMDAsImV4cCI6MTczMTQxNjkwMH0.signature\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJqdGkiOiJ4eXo0NTYiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTczMTQxNjAwMCwiZXhwIjoxNzMyMDIwODAwfQ.signature\"\n}"
+            },
+            {
+              "name": "400 Bad Request — Validation error",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "login"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"VALIDATION_ERROR\",\n    \"message\": \"body/email must match format \\\"email\\\"\"\n  }\n}"
+            },
+            {
+              "name": "401 Unauthorized — Invalid credentials",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@cctv-cloud.local\",\n  \"password\": \"wrongpassword\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "login"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"INVALID_CREDENTIALS\",\n    \"message\": \"Invalid email or password\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ensure environment variables are set",
+                  "if (!pm.variables.get('adminEmail')) {",
+                  "    pm.variables.set('adminEmail', 'admin@cctv-cloud.local');",
+                  "}",
+                  "if (!pm.variables.get('adminPassword')) {",
+                  "    pm.variables.set('adminPassword', 'changeme123!');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has accessToken and refreshToken', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('accessToken').that.is.a('string').and.not.empty;",
+                  "    pm.expect(body).to.have.property('refreshToken').that.is.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('Tokens are RS256 JWTs (3-part structure)', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.accessToken.split('.').length).to.equal(3);",
+                  "    pm.expect(body.refreshToken.split('.').length).to.equal(3);",
+                  "});",
+                  "",
+                  "// Store tokens for subsequent requests",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "    console.log('Tokens stored in collection variables.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Tokens",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "refresh"]
+            },
+            "description": "Exchanges a valid refresh token for a **new access/refresh token pair**.\n\n**No authentication required** (the refresh token itself is the credential).\n\n> ⚠️ **Token Rotation**: Each refresh token is **single-use**. Once used, it is revoked in Redis immediately. Reusing a consumed refresh token returns `TOKEN_REVOKED`. Store the new `refreshToken` from the response.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiJ9...\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiJ9...\"\n}\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Missing `refreshToken` field |\n| 401 | `TOKEN_INVALID` | Token is malformed or signature invalid |\n| 401 | `TOKEN_REVOKED` | Token has already been used or was logged out |\n| 401 | `UNAUTHORIZED` | User account no longer active |"
+          },
+          "response": [
+            {
+              "name": "200 OK — New token pair",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "refresh"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJvcmdfaWQiOm51bGwsImp0aSI6Im5ld2p0aTEiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzMxNDE2MDYwLCJleHAiOjE3MzE0MTY5NjB9.signature\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJqdGkiOiJuZXdqdGkyIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE3MzE0MTYwNjAsImV4cCI6MTczMjAyMDg2MH0.signature\"\n}"
+            },
+            {
+              "name": "401 Unauthorized — Token revoked (reuse attempt)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...(already used)\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "refresh"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"TOKEN_REVOKED\",\n    \"message\": \"Refresh token has been revoked\"\n  }\n}"
+            },
+            {
+              "name": "401 Unauthorized — Invalid token",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"not.a.valid.token\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "refresh"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"TOKEN_INVALID\",\n    \"message\": \"Invalid refresh token\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has new accessToken and refreshToken', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('accessToken').that.is.a('string').and.not.empty;",
+                  "    pm.expect(body).to.have.property('refreshToken').that.is.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('New refresh token differs from old (rotation confirmed)', () => {",
+                  "    const body = pm.response.json();",
+                  "    const oldRefresh = pm.collectionVariables.get('refreshToken');",
+                  "    if (oldRefresh) {",
+                  "        pm.expect(body.refreshToken).to.not.equal(oldRefresh);",
+                  "    }",
+                  "});",
+                  "",
+                  "// Rotate stored tokens",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "    console.log('Tokens rotated in collection variables.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "logout"]
+            },
+            "description": "Revokes the provided refresh token, invalidating the session.\n\n**Requires a valid Super Admin access token** (`Authorization: Bearer <accessToken>`).\n\nAfter logout:\n- The `refreshToken` in the request body is removed from Redis\n- Any subsequent calls to `/refresh` with that token return `TOKEN_REVOKED`\n- The `accessToken` remains valid until its natural 15-minute expiry (stateless — not blocklisted)\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `204 No Content`\nEmpty body on success.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Missing `refreshToken` field |\n| 401 | `UNAUTHORIZED` | Missing or expired access token |"
+          },
+          "response": [
+            {
+              "name": "204 No Content — Logged out",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer eyJhbGciOiJSUzI1NiJ9..." }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "logout"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            },
+            {
+              "name": "401 Unauthorized — No access token",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "auth", "logout"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"UNAUTHORIZED\",\n    \"message\": \"Missing or invalid access token\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Warn if tokens are missing",
+                  "if (!pm.collectionVariables.get('accessToken')) {",
+                  "    console.warn('accessToken is not set — run Login first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('refreshToken')) {",
+                  "    console.warn('refreshToken is not set — run Login first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "",
+                  "pm.test('Response body is empty', () => {",
+                  "    pm.expect(pm.response.text()).to.equal('');",
+                  "});",
+                  "",
+                  "// Clear stored tokens after logout",
+                  "if (pm.response.code === 204) {",
+                  "    pm.collectionVariables.set('accessToken', '');",
+                  "    pm.collectionVariables.set('refreshToken', '');",
+                  "    console.log('Tokens cleared from collection variables after logout.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Workflow — Full Auth Lifecycle",
+      "description": "Run these requests **in order** to walk through the complete token lifecycle:\n\n1. **Login** → stores `accessToken` + `refreshToken`\n2. **Refresh Tokens** → rotates both tokens\n3. **Logout** → revokes the session\n4. **[Verify] Refresh after logout** → confirms `TOKEN_REVOKED`\n\nThis folder is intended for exploratory/manual testing and onboarding. Use the Runner to execute all four in sequence.",
+      "item": [
+        {
+          "name": "Step 1 — Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "login"]
+            },
+            "description": "Step 1 of the full auth lifecycle. Stores tokens automatically."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('adminEmail')) pm.variables.set('adminEmail', 'admin@cctv-cloud.local');",
+                  "if (!pm.variables.get('adminPassword')) pm.variables.set('adminPassword', 'changeme123!');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[Step 1] Login succeeds', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "    // Stash original refresh for the revocation test at step 4",
+                  "    pm.collectionVariables.set('_logoutRefreshToken', body.refreshToken);",
+                  "    console.log('[Step 1] Login OK — tokens stored.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Step 2 — Refresh Tokens",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "refresh"]
+            },
+            "description": "Step 2 of the full auth lifecycle. Rotates both tokens."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[Step 2] Refresh succeeds', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "    console.log('[Step 2] Tokens rotated.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Step 3 — Logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "logout"]
+            },
+            "description": "Step 3 of the full auth lifecycle. Revokes the current refresh token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[Step 3] Logout succeeds', () => pm.response.to.have.status(204));",
+                  "if (pm.response.code === 204) {",
+                  "    // Stash the revoked token for step 4 verification",
+                  "    pm.collectionVariables.set('_revokedRefreshToken', pm.collectionVariables.get('refreshToken'));",
+                  "    pm.collectionVariables.set('accessToken', '');",
+                  "    pm.collectionVariables.set('refreshToken', '');",
+                  "    console.log('[Step 3] Logged out — tokens cleared.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Step 4 — [Verify] Refresh after logout → 401",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{_revokedRefreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "refresh"]
+            },
+            "description": "Step 4 of the full auth lifecycle. Confirms the refresh token was revoked on logout."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[Step 4] Revoked token returns 401', () => pm.response.to.have.status(401));",
+                  "",
+                  "pm.test('[Step 4] Error code is TOKEN_REVOKED', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error.code).to.equal('TOKEN_REVOKED');",
+                  "});",
+                  "",
+                  "console.log('[Step 4] Revocation confirmed — full lifecycle test complete.');",
+                  "// Clean up temp variables",
+                  "pm.collectionVariables.unset('_revokedRefreshToken');",
+                  "pm.collectionVariables.unset('_logoutRefreshToken');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}
