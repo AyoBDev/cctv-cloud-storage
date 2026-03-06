@@ -537,6 +537,538 @@
       ]
     },
     {
+      "name": "Admin / Organizations",
+      "description": "Super Admin endpoints for managing organisations. All routes require a valid Super Admin access token.",
+      "item": [
+        {
+          "name": "List Organizations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/organizations?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "organizations"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Returns a paginated list of all organisations.\n\n### Query Parameters\n| Param | Type | Default | Max |\n|-------|------|---------|-----|\n| `page` | integer | 1 | — |\n| `limit` | integer | 20 | 100 |\n\n### Response `200 OK`\n```json\n{\n  \"data\": [ ... ],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 5 }\n}\n```"
+          },
+          "response": [
+            {
+              "name": "200 OK — Paginated list",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/organizations?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "organizations"],
+                  "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"name\": \"Acme Corp\",\n      \"slug\": \"acme-corp\",\n      \"is_active\": true,\n      \"created_at\": \"2024-01-15T10:00:00.000Z\",\n      \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n    }\n  ],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 1 }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('accessToken')) {",
+                  "    console.warn('accessToken not set — run Login first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has data array and pagination', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(body).to.have.property('pagination');",
+                  "    pm.expect(body.pagination).to.have.all.keys('page', 'limit', 'total');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Organization",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"adminEmail\": \"admin@acme-corp.com\",\n  \"adminPassword\": \"securepass123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/organizations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "organizations"]
+            },
+            "description": "Creates a new organisation along with an `org_admin` user in a single transaction. If the user INSERT fails (e.g. duplicate email), the entire transaction rolls back.\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `name` | string | ✓ | 1–255 chars |\n| `slug` | string | ✓ | `[a-z0-9-]+`, max 100 chars, unique |\n| `adminEmail` | string | ✓ | Valid email, unique |\n| `adminPassword` | string | ✓ | Min 8 chars |\n\n### Response `201 Created`\nReturns the created organisation object (no user details).\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid slug format, missing fields |\n| 409 | `CONFLICT` | Slug or admin email already taken |"
+          },
+          "response": [
+            {
+              "name": "201 Created — Organisation created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"adminEmail\": \"admin@acme-corp.com\",\n  \"adminPassword\": \"securepass123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/organizations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "organizations"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n}"
+            },
+            {
+              "name": "409 Conflict — Slug already taken",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Acme Corp 2\",\n  \"slug\": \"acme-corp\",\n  \"adminEmail\": \"admin2@acme-corp.com\",\n  \"adminPassword\": \"securepass123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/organizations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "organizations"]
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"CONFLICT\",\n    \"message\": \"Slug already taken\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response has org fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys('id', 'name', 'slug', 'is_active', 'created_at', 'updated_at');",
+                  "    pm.expect(body.is_active).to.be.true;",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('orgId', pm.response.json().id);",
+                  "    console.log('orgId stored:', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Organization",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/organizations/{{orgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "organizations", "{{orgId}}"]
+            },
+            "description": "Fetches a single organisation by UUID.\n\n### Path Parameters\n| Param | Type | Description |\n|-------|------|-------------|\n| `orgId` | UUID | Organisation ID |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | `orgId` is not a valid UUID |\n| 404 | `NOT_FOUND` | Organisation does not exist |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Organisation found",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/organizations/550e8400-e29b-41d4-a716-446655440000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "organizations", "550e8400-e29b-41d4-a716-446655440000"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/organizations/00000000-0000-0000-0000-000000000000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "organizations", "00000000-0000-0000-0000-000000000000"]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"NOT_FOUND\",\n    \"message\": \"Organization not found\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has org fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys('id', 'name', 'slug', 'is_active', 'created_at', 'updated_at');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Organization",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corporation\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/organizations/{{orgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "organizations", "{{orgId}}"]
+            },
+            "description": "Partially updates an organisation. At least one field must be provided.\n\n### Request Body (all optional, min 1)\n| Field | Type | Constraints |\n|-------|------|-------------|\n| `name` | string | 1–255 chars |\n| `slug` | string | `[a-z0-9-]+`, max 100, unique |\n| `is_active` | boolean | — |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Empty body or invalid field values |\n| 404 | `NOT_FOUND` | Organisation does not exist |\n| 409 | `CONFLICT` | Slug already taken by another org |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Updated",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Acme Corporation\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/organizations/550e8400-e29b-41d4-a716-446655440000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "organizations", "550e8400-e29b-41d4-a716-446655440000"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Acme Corporation\",\n  \"slug\": \"acme-corp\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:05:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has org fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys('id', 'name', 'slug', 'is_active', 'created_at', 'updated_at');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Organization",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/organizations/{{orgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "organizations", "{{orgId}}"]
+            },
+            "description": "Soft-deletes an organisation by setting `is_active = false`. All users in the organisation are also deactivated in the same transaction.\n\n### Response `204 No Content`\nEmpty body on success.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 404 | `NOT_FOUND` | Organisation does not exist |"
+          },
+          "response": [
+            {
+              "name": "204 No Content — Soft deleted",
+              "originalRequest": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/organizations/550e8400-e29b-41d4-a716-446655440000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "organizations", "550e8400-e29b-41d4-a716-446655440000"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Response body is empty', () => {",
+                  "    pm.expect(pm.response.text()).to.equal('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin / Users",
+      "description": "Super Admin endpoints for managing users across all organisations. All routes require a valid Super Admin access token.",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "orgId", "value": "", "description": "Optional: filter by organisation UUID", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of users. Optionally filter by `orgId`.\n\n`password_hash` is never included in any user response.\n\n### Query Parameters\n| Param | Type | Default | Description |\n|-------|------|---------|-------------|\n| `page` | integer | 1 | Page number |\n| `limit` | integer | 20 | Max 100 |\n| `orgId` | UUID | — | Filter to one org |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Paginated list",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/users?page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "users"],
+                  "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440001\",\n      \"email\": \"admin@acme-corp.com\",\n      \"role\": \"org_admin\",\n      \"org_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"is_active\": true,\n      \"created_at\": \"2024-01-15T10:00:00.000Z\",\n      \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n    }\n  ],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 1 }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has data array and pagination', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(body).to.have.property('pagination');",
+                  "});",
+                  "pm.test('No password_hash in any user', () => {",
+                  "    const body = pm.response.json();",
+                  "    body.data.forEach(user => {",
+                  "        pm.expect(user).to.not.have.property('password_hash');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}"]
+            },
+            "description": "Fetches a single user by UUID. `password_hash` is never returned.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | `userId` is not a valid UUID |\n| 404 | `NOT_FOUND` | User does not exist |"
+          },
+          "response": [
+            {
+              "name": "200 OK — User found",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-446655440001",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-446655440001"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"email\": \"admin@acme-corp.com\",\n  \"role\": \"org_admin\",\n  \"org_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has user fields (no password_hash)', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys('id', 'email', 'role', 'org_id', 'is_active', 'created_at', 'updated_at');",
+                  "    pm.expect(body).to.not.have.property('password_hash');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update User Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}"]
+            },
+            "description": "Activates or deactivates a user account.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `is_active` | boolean | ✓ |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Missing or invalid `is_active` |\n| 404 | `NOT_FOUND` | User does not exist |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Status updated",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_active\": false\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-446655440001",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-446655440001"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"email\": \"admin@acme-corp.com\",\n  \"role\": \"org_admin\",\n  \"org_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"is_active\": false,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:10:00.000Z\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is_active reflects the update', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('is_active');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}"]
+            },
+            "description": "Permanently deletes a user. `super_admin` users cannot be deleted.\n\n### Response `204 No Content`\nEmpty body on success.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 403 | `FORBIDDEN` | Target user is a `super_admin` |\n| 404 | `NOT_FOUND` | User does not exist |"
+          },
+          "response": [
+            {
+              "name": "204 No Content — Deleted",
+              "originalRequest": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-446655440001",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-446655440001"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "body": ""
+            },
+            {
+              "name": "403 Forbidden — Cannot delete super_admin",
+              "originalRequest": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-000000000001",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-000000000001"]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": {\n    \"code\": \"FORBIDDEN\",\n    \"message\": \"Cannot delete a super admin\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Response body is empty', () => {",
+                  "    pm.expect(pm.response.text()).to.equal('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "⚙️ Workflow — Full Auth Lifecycle",
       "description": "Run these requests **in order** to walk through the complete token lifecycle:\n\n1. **Login** → stores `accessToken` + `refreshToken`\n2. **Refresh Tokens** → rotates both tokens\n3. **Logout** → revokes the session\n4. **[Verify] Refresh after logout** → confirms `TOKEN_REVOKED`\n\nThis folder is intended for exploratory/manual testing and onboarding. Use the Runner to execute all four in sequence.",
       "item": [

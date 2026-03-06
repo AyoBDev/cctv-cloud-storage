@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance } from 'fastify';
+import { ZodError } from 'zod';
 import { env } from '@config/env';
 import { AppError } from '@utils/errors';
 
@@ -56,6 +57,12 @@ export function buildApp(): FastifyInstance {
     if (err instanceof AppError) {
       return reply.code(err.statusCode).send({
         error: { code: err.code, message: err.message },
+      });
+    }
+
+    if (err instanceof ZodError) {
+      return reply.code(400).send({
+        error: { code: 'VALIDATION_ERROR', message: err.errors[0]?.message ?? 'Validation failed' },
       });
     }
 
