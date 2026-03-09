@@ -1,0 +1,30 @@
+# Terraform local state (bootstrap only uses local)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Plan files
+*.tfplan
+
+# Crash log
+crash.log
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI config
+.terraformrc
+terraform.rc
+
+# Terraform working directories
+**/.terraform/
+
+# Placeholder lambda zip (generated at plan time)
+**/placeholder.zip
+
+# Secrets — never commit
+*.tfvars.local
+secrets.auto.tfvars
