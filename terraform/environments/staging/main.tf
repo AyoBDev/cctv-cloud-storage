@@ -98,19 +98,19 @@ module "database" {
 module "compute" {
   source = "../../modules/compute"
 
-  project                    = local.project
-  environment                = local.environment
-  vpc_id                     = module.networking.vpc_id
-  public_subnet_ids          = module.networking.public_subnet_ids
-  private_subnet_ids         = module.networking.private_subnet_ids
-  alb_sg_id                  = module.networking.alb_sg_id
-  ecs_sg_id                  = module.networking.ecs_sg_id
+  project                     = local.project
+  environment                 = local.environment
+  vpc_id                      = module.networking.vpc_id
+  public_subnet_ids           = module.networking.public_subnet_ids
+  private_subnet_ids          = module.networking.private_subnet_ids
+  alb_sg_id                   = module.networking.alb_sg_id
+  ecs_sg_id                   = module.networking.ecs_sg_id
   ecs_task_execution_role_arn = module.iam.ecs_task_execution_role_arn
   ecs_task_role_arn           = module.iam.ecs_task_role_arn
-  task_cpu                   = 256
-  task_memory                = 512
-  desired_count              = 1
-  cors_origin                = var.cors_origin
+  task_cpu                    = 256
+  task_memory                 = 512
+  desired_count               = 1
+  cors_origin                 = var.cors_origin
 }
 
 # ---------------------------------------------------------------------------
@@ -127,6 +127,18 @@ module "lambda" {
   media_bucket_name         = module.storage.media_bucket_name
   internal_api_url          = "http://${module.compute.alb_dns_name}"
   aws_account_id            = data.aws_caller_identity.current.account_id
+}
+
+# ---------------------------------------------------------------------------
+# IoT (camera device provisioning)
+# ---------------------------------------------------------------------------
+module "iot" {
+  source = "../../modules/iot"
+
+  project        = local.project
+  environment    = local.environment
+  aws_region     = var.aws_region
+  aws_account_id = data.aws_caller_identity.current.account_id
 }
 
 # ---------------------------------------------------------------------------
