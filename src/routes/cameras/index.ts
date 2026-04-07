@@ -262,7 +262,14 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
     },
     async (request, reply) => {
       const params = cameraIdParamsSchema.parse(request.params);
-      await deactivateCamera(app.db, app.redis, app.kvs, app.iot, request.user.org_id!, params.cameraId);
+      await deactivateCamera(
+        app.db,
+        app.redis,
+        app.kvs,
+        app.iot,
+        request.user.org_id!,
+        params.cameraId,
+      );
       return reply.code(204).send();
     },
   );
@@ -299,14 +306,16 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
       const orgId = request.user.org_id!;
 
       // Fetch camera and verify ownership
-      const rows = await app.db<Array<{
-        id: string;
-        org_id: string;
-        iot_thing_name: string | null;
-        kvs_stream_name: string;
-        credentials_issued: boolean;
-        is_active: boolean;
-      }>>`
+      const rows = await app.db<
+        Array<{
+          id: string;
+          org_id: string;
+          iot_thing_name: string | null;
+          kvs_stream_name: string;
+          credentials_issued: boolean;
+          is_active: boolean;
+        }>
+      >`
         SELECT id, org_id, iot_thing_name, kvs_stream_name, credentials_issued, is_active
         FROM cameras
         WHERE id = ${params.cameraId} AND is_active = true
@@ -323,11 +332,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
       }
 
       // Issue credentials
-      const creds = await issueCredentials(
-        app.iot,
-        camera.iot_thing_name,
-        env.IOT_POLICY_NAME,
-      );
+      const creds = await issueCredentials(app.iot, camera.iot_thing_name, env.IOT_POLICY_NAME);
 
       // Get cached credential endpoint
       const endpoint = await getCredentialEndpoint(app.iot);

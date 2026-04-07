@@ -149,7 +149,9 @@ describe('Cameras', () => {
       const body = res.json<{ id: string; kvs_stream_name: string }>();
 
       // Verify IoT fields in DB directly
-      const dbRows = await app.db<Array<{ iot_thing_name: string | null; credentials_issued: boolean }>>`
+      const dbRows = await app.db<
+        Array<{ iot_thing_name: string | null; credentials_issued: boolean }>
+      >`
         SELECT iot_thing_name, credentials_issued FROM cameras WHERE id = ${body.id}
       `;
       expect(dbRows[0]?.iot_thing_name).toBe(body.kvs_stream_name);

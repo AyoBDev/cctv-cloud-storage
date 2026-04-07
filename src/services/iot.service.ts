@@ -18,17 +18,12 @@ const isTestEnv = () => env.NODE_ENV === 'test';
 
 let cachedEndpoint: string | null = null;
 
-export async function createIoTThing(
-  iot: IoTClient,
-  thingName: string,
-): Promise<string> {
+export async function createIoTThing(iot: IoTClient, thingName: string): Promise<string> {
   if (isTestEnv()) {
     return `arn:aws:iot:eu-west-2:000000000000:thing/${thingName}`;
   }
 
-  const result = await iot.send(
-    new CreateThingCommand({ thingName }),
-  );
+  const result = await iot.send(new CreateThingCommand({ thingName }));
 
   if (!result.thingArn) {
     throw new Error('CreateThing returned no ARN');
@@ -82,9 +77,7 @@ export async function deleteIoTThing(
   }
 
   // 5. Delete Thing
-  await iot.send(
-    new DeleteThingCommand({ thingName }),
-  );
+  await iot.send(new DeleteThingCommand({ thingName }));
 }
 
 export interface IssuedCredentials {
@@ -109,12 +102,14 @@ export async function issueCredentials(
   }
 
   // 1. Create cert + keys (set as active)
-  const certResult = await iot.send(
-    new CreateKeysAndCertificateCommand({ setAsActive: true }),
-  );
+  const certResult = await iot.send(new CreateKeysAndCertificateCommand({ setAsActive: true }));
 
-  if (!certResult.certificateId || !certResult.certificateArn ||
-      !certResult.certificatePem || !certResult.keyPair?.PrivateKey) {
+  if (
+    !certResult.certificateId ||
+    !certResult.certificateArn ||
+    !certResult.certificatePem ||
+    !certResult.keyPair?.PrivateKey
+  ) {
     throw new Error('CreateKeysAndCertificate returned incomplete data');
   }
 
@@ -139,21 +134,15 @@ export async function issueCredentials(
     );
   } catch (err) {
     // Rollback: revoke and delete the orphaned certificate
-    await iot.send(
-      new UpdateCertificateCommand({ certificateId, newStatus: 'INACTIVE' }),
-    );
-    await iot.send(
-      new DeleteCertificateCommand({ certificateId, forceDelete: true }),
-    );
+    await iot.send(new UpdateCertificateCommand({ certificateId, newStatus: 'INACTIVE' }));
+    await iot.send(new DeleteCertificateCommand({ certificateId, forceDelete: true }));
     throw err;
   }
 
   return { certificateId, certificateArn, certificatePem, privateKey };
 }
 
-export async function getCredentialEndpoint(
-  iot: IoTClient,
-): Promise<string> {
+export async function getCredentialEndpoint(iot: IoTClient): Promise<string> {
   if (isTestEnv()) {
     return 'test-endpoint.credentials.iot.eu-west-2.amazonaws.com';
   }
