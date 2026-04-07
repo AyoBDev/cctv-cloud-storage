@@ -85,8 +85,8 @@ resource "aws_iam_role_policy" "ecs_task_app" {
     Statement = [
       # KMS — encrypt/decrypt RTSP URLs
       {
-        Effect = "Allow"
-        Action = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey"]
+        Effect   = "Allow"
+        Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey"]
         Resource = "*"
       },
       # KVS — manage streams
@@ -147,6 +147,23 @@ resource "aws_iam_role_policy" "ecs_task_app" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/cctv/${var.environment}/*"
+      },
+      # IoT — manage Things and certificates for camera provisioning
+      {
+        Effect = "Allow"
+        Action = [
+          "iot:CreateThing",
+          "iot:DeleteThing",
+          "iot:CreateKeysAndCertificate",
+          "iot:UpdateCertificate",
+          "iot:DeleteCertificate",
+          "iot:AttachPolicy",
+          "iot:DetachPolicy",
+          "iot:AttachThingPrincipal",
+          "iot:DetachThingPrincipal",
+          "iot:DescribeEndpoint"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -208,8 +225,8 @@ resource "aws_iam_role_policy" "lambda_app" {
       },
       # SSM — read internal API secret
       {
-        Effect = "Allow"
-        Action = ["ssm:GetParameter"]
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
         Resource = "arn:aws:ssm:${local.region}:${local.account_id}:parameter${local.ssm_prefix}/internal-api-secret"
       },
       {
