@@ -13,6 +13,7 @@ export const ErrorCodes = {
   // Resources
   NOT_FOUND: 'NOT_FOUND',
   CONFLICT: 'CONFLICT',
+  BAD_REQUEST: 'BAD_REQUEST',
 
   // Server
   INTERNAL_ERROR: 'INTERNAL_ERROR',
@@ -46,6 +47,10 @@ export class AppError extends Error {
 
   static conflict(message: string): AppError {
     return new AppError(ErrorCodes.CONFLICT, message, 409);
+  }
+
+  static badRequest(message: string): AppError {
+    return new AppError(ErrorCodes.BAD_REQUEST, message, 400);
   }
 
   static invalidCredentials(): AppError {
