@@ -28,6 +28,48 @@
       "value": "",
       "type": "string",
       "description": "Set automatically by the Login and Refresh requests."
+    },
+    {
+      "key": "orgAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by org Auth Login request test script."
+    },
+    {
+      "key": "orgRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by org Auth Login and Refresh requests."
+    },
+    {
+      "key": "orgUserId",
+      "value": "",
+      "type": "string",
+      "description": "Set after creating an org user. Used by GET/PATCH/DELETE org user requests."
+    },
+    {
+      "key": "cameraId",
+      "value": "",
+      "type": "string",
+      "description": "Set after creating a camera. Used by GET/PATCH/DELETE camera requests."
+    },
+    {
+      "key": "internalApiSecret",
+      "value": "",
+      "type": "string",
+      "description": "Shared secret for internal webhook endpoints. Set in environment."
+    },
+    {
+      "key": "iotCredentialEndpoint",
+      "value": "",
+      "type": "string",
+      "description": "IoT credential provider endpoint. Set automatically by Download Camera Credentials request."
+    },
+    {
+      "key": "kvsStreamName",
+      "value": "",
+      "type": "string",
+      "description": "KVS stream name for the camera. Set automatically by Download Camera Credentials request."
     }
   ],
   "auth": {
@@ -85,8 +127,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
             },
             "description": "Returns the operational status of the API and its dependencies.\n\n**No authentication required.**\n\n### Response\n```json\n{\n  \"status\": \"ok\",\n  \"db\": \"ok\",\n  \"redis\": \"ok\"\n}\n```\n\n`status` is `\"ok\"` only when both `db` and `redis` are `\"ok\"`. Otherwise `\"degraded\"`.\n\n### Rate Limit\n300 requests per minute (higher than default)."
           },
@@ -97,14 +143,21 @@
                 "method": "GET",
                 "url": {
                   "raw": "{{baseUrl}}/health",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["health"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
               "header": [
-                { "key": "Content-Type", "value": "application/json" }
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
               ],
               "body": "{\n  \"status\": \"ok\",\n  \"db\": \"ok\",\n  \"redis\": \"ok\"\n}"
             },
@@ -114,14 +167,21 @@
                 "method": "GET",
                 "url": {
                   "raw": "{{baseUrl}}/health",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["health"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
               "header": [
-                { "key": "Content-Type", "value": "application/json" }
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
               ],
               "body": "{\n  \"status\": \"degraded\",\n  \"db\": \"error\",\n  \"redis\": \"ok\"\n}"
             }
@@ -175,13 +235,23 @@
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
               "options": {
-                "raw": { "language": "json" }
+                "raw": {
+                  "language": "json"
+                }
               }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "login"
+              ]
             },
             "description": "Authenticates a Super Admin and returns an RS256 JWT access/refresh token pair.\n\n**No authentication required.**\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `email` | string | ✓ | Valid email format |\n| `password` | string | ✓ | Minimum 8 characters |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiJ9...\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiJ9...\"\n}\n```\n\n| Token | Algorithm | Expiry | Storage recommendation |\n|-------|-----------|--------|-----------------------|\n| `accessToken` | RS256 | 15 min | Memory only (not localStorage) |\n| `refreshToken` | RS256 | 7 days | HttpOnly cookie or secure storage |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid email format or password < 8 chars |\n| 401 | `INVALID_CREDENTIALS` | Email not found or password incorrect |\n| 403 | `FORBIDDEN` | Account is deactivated |"
           },
@@ -190,60 +260,114 @@
               "name": "200 OK — Token pair issued",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"email\": \"admin@cctv-cloud.local\",\n  \"password\": \"changeme123!\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/login",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "login"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "login"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJvcmdfaWQiOm51bGwsImp0aSI6ImFiYzEyMyIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3MzE0MTYwMDAsImV4cCI6MTczMTQxNjkwMH0.signature\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJqdGkiOiJ4eXo0NTYiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTczMTQxNjAwMCwiZXhwIjoxNzMyMDIwODAwfQ.signature\"\n}"
             },
             {
               "name": "400 Bad Request — Validation error",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/login",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "login"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "login"
+                  ]
                 }
               },
               "status": "Bad Request",
               "code": 400,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"VALIDATION_ERROR\",\n    \"message\": \"body/email must match format \\\"email\\\"\"\n  }\n}"
             },
             {
               "name": "401 Unauthorized — Invalid credentials",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"email\": \"admin@cctv-cloud.local\",\n  \"password\": \"wrongpassword\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/login",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "login"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "login"
+                  ]
                 }
               },
               "status": "Unauthorized",
               "code": 401,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"INVALID_CREDENTIALS\",\n    \"message\": \"Invalid email or password\"\n  }\n}"
             }
           ],
@@ -311,13 +435,23 @@
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
               "options": {
-                "raw": { "language": "json" }
+                "raw": {
+                  "language": "json"
+                }
               }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "auth", "refresh"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "refresh"
+              ]
             },
             "description": "Exchanges a valid refresh token for a **new access/refresh token pair**.\n\n**No authentication required** (the refresh token itself is the credential).\n\n> ⚠️ **Token Rotation**: Each refresh token is **single-use**. Once used, it is revoked in Redis immediately. Reusing a consumed refresh token returns `TOKEN_REVOKED`. Store the new `refreshToken` from the response.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiJ9...\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiJ9...\"\n}\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Missing `refreshToken` field |\n| 401 | `TOKEN_INVALID` | Token is malformed or signature invalid |\n| 401 | `TOKEN_REVOKED` | Token has already been used or was logged out |\n| 401 | `UNAUTHORIZED` | User account no longer active |"
           },
@@ -326,60 +460,114 @@
               "name": "200 OK — New token pair",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "refresh"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "refresh"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"accessToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJvcmdfaWQiOm51bGwsImp0aSI6Im5ld2p0aTEiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzMxNDE2MDYwLCJleHAiOjE3MzE0MTY5NjB9.signature\",\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZDNmOGEwMS0uLi4iLCJqdGkiOiJuZXdqdGkyIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE3MzE0MTYwNjAsImV4cCI6MTczMjAyMDg2MH0.signature\"\n}"
             },
             {
               "name": "401 Unauthorized — Token revoked (reuse attempt)",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...(already used)\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "refresh"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "refresh"
+                  ]
                 }
               },
               "status": "Unauthorized",
               "code": 401,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"TOKEN_REVOKED\",\n    \"message\": \"Refresh token has been revoked\"\n  }\n}"
             },
             {
               "name": "401 Unauthorized — Invalid token",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"refreshToken\": \"not.a.valid.token\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "refresh"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "refresh"
+                  ]
                 }
               },
               "status": "Unauthorized",
               "code": 401,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"TOKEN_INVALID\",\n    \"message\": \"Invalid refresh token\"\n  }\n}"
             }
           ],
@@ -441,13 +629,23 @@
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
               "options": {
-                "raw": { "language": "json" }
+                "raw": {
+                  "language": "json"
+                }
               }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "auth", "logout"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "logout"
+              ]
             },
             "description": "Revokes the provided refresh token, invalidating the session.\n\n**Requires a valid Super Admin access token** (`Authorization: Bearer <accessToken>`).\n\nAfter logout:\n- The `refreshToken` in the request body is removed from Redis\n- Any subsequent calls to `/refresh` with that token return `TOKEN_REVOKED`\n- The `accessToken` remains valid until its natural 15-minute expiry (stateless — not blocklisted)\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `204 No Content`\nEmpty body on success.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Missing `refreshToken` field |\n| 401 | `UNAUTHORIZED` | Missing or expired access token |"
           },
@@ -457,8 +655,14 @@
               "originalRequest": {
                 "method": "POST",
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "Authorization", "value": "Bearer eyJhbGciOiJSUzI1NiJ9..." }
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer eyJhbGciOiJSUzI1NiJ9..."
+                  }
                 ],
                 "body": {
                   "mode": "raw",
@@ -466,8 +670,16 @@
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "logout"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "logout"
+                  ]
                 }
               },
               "status": "No Content",
@@ -479,20 +691,38 @@
               "name": "401 Unauthorized — No access token",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "auth", "logout"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "auth",
+                    "logout"
+                  ]
                 }
               },
               "status": "Unauthorized",
               "code": 401,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"UNAUTHORIZED\",\n    \"message\": \"Missing or invalid access token\"\n  }\n}"
             }
           ],
@@ -547,11 +777,24 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/organizations?page=1&limit=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "organizations"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "organizations"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
               ]
             },
             "description": "Returns a paginated list of all organisations.\n\n### Query Parameters\n| Param | Type | Default | Max |\n|-------|------|---------|-----|\n| `page` | integer | 1 | — |\n| `limit` | integer | 20 | 100 |\n\n### Response `200 OK`\n```json\n{\n  \"data\": [ ... ],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 5 }\n}\n```"
@@ -563,14 +806,35 @@
                 "method": "GET",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/organizations?page=1&limit=20",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "organizations"],
-                  "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "organizations"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"data\": [\n    {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"name\": \"Acme Corp\",\n      \"slug\": \"acme-corp\",\n      \"is_active\": true,\n      \"created_at\": \"2024-01-15T10:00:00.000Z\",\n      \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n    }\n  ],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 1 }\n}"
             }
           ],
@@ -607,16 +871,32 @@
           "name": "Create Organization",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"adminEmail\": \"admin@acme-corp.com\",\n  \"adminPassword\": \"securepass123!\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/organizations",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "organizations"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "organizations"
+              ]
             },
             "description": "Creates a new organisation along with an `org_admin` user in a single transaction. If the user INSERT fails (e.g. duplicate email), the entire transaction rolls back.\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `name` | string | ✓ | 1–255 chars |\n| `slug` | string | ✓ | `[a-z0-9-]+`, max 100 chars, unique |\n| `adminEmail` | string | ✓ | Valid email, unique |\n| `adminPassword` | string | ✓ | Min 8 chars |\n\n### Response `201 Created`\nReturns the created organisation object (no user details).\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid slug format, missing fields |\n| 409 | `CONFLICT` | Slug or admin email already taken |"
           },
@@ -625,40 +905,74 @@
               "name": "201 Created — Organisation created",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"adminEmail\": \"admin@acme-corp.com\",\n  \"adminPassword\": \"securepass123!\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/organizations",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "organizations"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "organizations"
+                  ]
                 }
               },
               "status": "Created",
               "code": 201,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n}"
             },
             {
               "name": "409 Conflict — Slug already taken",
               "originalRequest": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Acme Corp 2\",\n  \"slug\": \"acme-corp\",\n  \"adminEmail\": \"admin2@acme-corp.com\",\n  \"adminPassword\": \"securepass123!\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/organizations",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "organizations"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "organizations"
+                  ]
                 }
               },
               "status": "Conflict",
               "code": 409,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"CONFLICT\",\n    \"message\": \"Slug already taken\"\n  }\n}"
             }
           ],
@@ -690,8 +1004,16 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/organizations/{{orgId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "organizations", "{{orgId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "organizations",
+                "{{orgId}}"
+              ]
             },
             "description": "Fetches a single organisation by UUID.\n\n### Path Parameters\n| Param | Type | Description |\n|-------|------|-------------|\n| `orgId` | UUID | Organisation ID |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | `orgId` is not a valid UUID |\n| 404 | `NOT_FOUND` | Organisation does not exist |"
           },
@@ -702,13 +1024,26 @@
                 "method": "GET",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/organizations/550e8400-e29b-41d4-a716-446655440000",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "organizations", "550e8400-e29b-41d4-a716-446655440000"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "organizations",
+                    "550e8400-e29b-41d4-a716-446655440000"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n}"
             },
             {
@@ -717,13 +1052,26 @@
                 "method": "GET",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/organizations/00000000-0000-0000-0000-000000000000",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "organizations", "00000000-0000-0000-0000-000000000000"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "organizations",
+                    "00000000-0000-0000-0000-000000000000"
+                  ]
                 }
               },
               "status": "Not Found",
               "code": 404,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"NOT_FOUND\",\n    \"message\": \"Organization not found\"\n  }\n}"
             }
           ],
@@ -747,16 +1095,33 @@
           "name": "Update Organization",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Acme Corporation\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/organizations/{{orgId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "organizations", "{{orgId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "organizations",
+                "{{orgId}}"
+              ]
             },
             "description": "Partially updates an organisation. At least one field must be provided.\n\n### Request Body (all optional, min 1)\n| Field | Type | Constraints |\n|-------|------|-------------|\n| `name` | string | 1–255 chars |\n| `slug` | string | `[a-z0-9-]+`, max 100, unique |\n| `is_active` | boolean | — |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Empty body or invalid field values |\n| 404 | `NOT_FOUND` | Organisation does not exist |\n| 409 | `CONFLICT` | Slug already taken by another org |"
           },
@@ -765,20 +1130,38 @@
               "name": "200 OK — Updated",
               "originalRequest": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Acme Corporation\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/organizations/550e8400-e29b-41d4-a716-446655440000",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "organizations", "550e8400-e29b-41d4-a716-446655440000"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "organizations",
+                    "550e8400-e29b-41d4-a716-446655440000"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Acme Corporation\",\n  \"slug\": \"acme-corp\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:05:00.000Z\"\n}"
             }
           ],
@@ -805,8 +1188,16 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/organizations/{{orgId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "organizations", "{{orgId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "organizations",
+                "{{orgId}}"
+              ]
             },
             "description": "Soft-deletes an organisation by setting `is_active = false`. All users in the organisation are also deactivated in the same transaction.\n\n### Response `204 No Content`\nEmpty body on success.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 404 | `NOT_FOUND` | Organisation does not exist |"
           },
@@ -817,8 +1208,16 @@
                 "method": "DELETE",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/organizations/550e8400-e29b-41d4-a716-446655440000",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "organizations", "550e8400-e29b-41d4-a716-446655440000"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "organizations",
+                    "550e8400-e29b-41d4-a716-446655440000"
+                  ]
                 }
               },
               "status": "No Content",
@@ -855,12 +1254,30 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/users?page=1&limit=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "users"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" },
-                { "key": "orgId", "value": "", "description": "Optional: filter by organisation UUID", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "orgId",
+                  "value": "",
+                  "description": "Optional: filter by organisation UUID",
+                  "disabled": true
+                }
               ]
             },
             "description": "Returns a paginated list of users. Optionally filter by `orgId`.\n\n`password_hash` is never included in any user response.\n\n### Query Parameters\n| Param | Type | Default | Description |\n|-------|------|---------|-------------|\n| `page` | integer | 1 | Page number |\n| `limit` | integer | 20 | Max 100 |\n| `orgId` | UUID | — | Filter to one org |"
@@ -872,14 +1289,35 @@
                 "method": "GET",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/users?page=1&limit=20",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "users"],
-                  "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"data\": [\n    {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440001\",\n      \"email\": \"admin@acme-corp.com\",\n      \"role\": \"org_admin\",\n      \"org_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"is_active\": true,\n      \"created_at\": \"2024-01-15T10:00:00.000Z\",\n      \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n    }\n  ],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 1 }\n}"
             }
           ],
@@ -913,8 +1351,16 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "users", "{{userId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
             },
             "description": "Fetches a single user by UUID. `password_hash` is never returned.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | `userId` is not a valid UUID |\n| 404 | `NOT_FOUND` | User does not exist |"
           },
@@ -925,13 +1371,26 @@
                 "method": "GET",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-446655440001",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-446655440001"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "550e8400-e29b-41d4-a716-446655440001"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"email\": \"admin@acme-corp.com\",\n  \"role\": \"org_admin\",\n  \"org_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"is_active\": true,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:00:00.000Z\"\n}"
             }
           ],
@@ -956,16 +1415,33 @@
           "name": "Update User Status",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"is_active\": false\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "users", "{{userId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
             },
             "description": "Activates or deactivates a user account.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `is_active` | boolean | ✓ |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Missing or invalid `is_active` |\n| 404 | `NOT_FOUND` | User does not exist |"
           },
@@ -974,20 +1450,38 @@
               "name": "200 OK — Status updated",
               "originalRequest": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"is_active\": false\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-446655440001",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-446655440001"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "550e8400-e29b-41d4-a716-446655440001"
+                  ]
                 }
               },
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"email\": \"admin@acme-corp.com\",\n  \"role\": \"org_admin\",\n  \"org_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"is_active\": false,\n  \"created_at\": \"2024-01-15T10:00:00.000Z\",\n  \"updated_at\": \"2024-01-15T10:10:00.000Z\"\n}"
             }
           ],
@@ -1014,8 +1508,16 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "users", "{{userId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
             },
             "description": "Permanently deletes a user. `super_admin` users cannot be deleted.\n\n### Response `204 No Content`\nEmpty body on success.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 403 | `FORBIDDEN` | Target user is a `super_admin` |\n| 404 | `NOT_FOUND` | User does not exist |"
           },
@@ -1026,8 +1528,16 @@
                 "method": "DELETE",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-446655440001",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-446655440001"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "550e8400-e29b-41d4-a716-446655440001"
+                  ]
                 }
               },
               "status": "No Content",
@@ -1041,13 +1551,26 @@
                 "method": "DELETE",
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/admin/users/550e8400-e29b-41d4-a716-000000000001",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "admin", "users", "550e8400-e29b-41d4-a716-000000000001"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "550e8400-e29b-41d4-a716-000000000001"
+                  ]
                 }
               },
               "status": "Forbidden",
               "code": 403,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"error\": {\n    \"code\": \"FORBIDDEN\",\n    \"message\": \"Cannot delete a super admin\"\n  }\n}"
             }
           ],
@@ -1069,24 +1592,584 @@
       ]
     },
     {
+      "name": "Auth",
+      "description": "Org user authentication endpoints. Supports org_admin and viewer roles.\n\nUse **Login** to obtain tokens, then subsequent requests auto-use `orgAccessToken`.",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{orgAdminEmail}}\",\n  \"password\": \"{{orgAdminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticates an org user (org_admin or viewer) and returns an RS256 JWT access/refresh token pair.\n\n**No authentication required.**\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `email` | string | ✓ | Valid email format |\n| `password` | string | ✓ | Minimum 8 characters |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid email format or password < 8 chars |\n| 401 | `INVALID_CREDENTIALS` | Email not found or password incorrect |\n| 403 | `FORBIDDEN` | Account or organization is deactivated |"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has accessToken and refreshToken', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('accessToken').that.is.a('string').and.not.empty;",
+                  "    pm.expect(body).to.have.property('refreshToken').that.is.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "// Store org tokens for subsequent requests",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('orgAccessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('orgRefreshToken', body.refreshToken);",
+                  "    console.log('Org tokens stored in collection variables.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Tokens",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{orgRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Exchanges a valid refresh token for a new access/refresh token pair. The old refresh token is revoked (rotation).\n\n**No authentication required** — the refresh token is the credential.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}\n```"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "// Rotate org tokens",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('orgAccessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('orgRefreshToken', body.refreshToken);",
+                  "    console.log('Org tokens rotated.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{orgRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revokes the provided refresh token. Requires a valid org user access token.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `204 No Content`\nEmpty body."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "",
+                  "// Clear org tokens",
+                  "pm.collectionVariables.set('orgAccessToken', '');",
+                  "pm.collectionVariables.set('orgRefreshToken', '');",
+                  "console.log('Org tokens cleared.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"password123!\",\n  \"newPassword\": \"newpassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Changes the authenticated org user's password.\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `currentPassword` | string | ✓ | Minimum 8 characters |\n| `newPassword` | string | ✓ | Minimum 8 characters |\n\n### Response `200 OK`\n```json\n{\n  \"message\": \"Password changed successfully\"\n}\n```"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has success message', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('message', 'Password changed successfully');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Org / Users",
+      "description": "Org admin user management. Requires `org_admin` role. All queries are scoped to the authenticated user's organization.",
+      "item": [
+        {
+          "name": "List Org Users",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Returns a paginated list of users in the authenticated admin's organization.\n\n### Query Parameters\n| Param | Type | Default | Max |\n|-------|------|---------|-----|\n| `page` | integer | 1 | — |\n| `limit` | integer | 20 | 100 |\n\n### Response `200 OK`\n```json\n{\n  \"data\": [{ \"id\": \"...\", \"email\": \"...\", \"role\": \"viewer\", \"org_id\": \"...\", \"is_active\": true }],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 5 }\n}\n```"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has data and pagination', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('data').that.is.an('array');",
+                  "    pm.expect(body).to.have.property('pagination');",
+                  "    pm.expect(body.pagination).to.have.property('page');",
+                  "    pm.expect(body.pagination).to.have.property('limit');",
+                  "    pm.expect(body.pagination).to.have.property('total');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Viewer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"viewer@example.com\",\n  \"password\": \"password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users"
+              ]
+            },
+            "description": "Creates a new viewer user in the authenticated admin's organization.\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `email` | string | ✓ | Valid email, unique |\n| `password` | string | ✓ | Minimum 8 characters |\n\n### Response `201 Created`\n```json\n{\n  \"id\": \"uuid\",\n  \"email\": \"viewer@example.com\",\n  \"role\": \"viewer\",\n  \"org_id\": \"uuid\",\n  \"is_active\": true,\n  \"created_at\": \"...\",\n  \"updated_at\": \"...\"\n}\n```"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test('Response has user with viewer role', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('id');",
+                  "    pm.expect(body).to.have.property('role', 'viewer');",
+                  "    pm.expect(body).to.have.property('org_id');",
+                  "});",
+                  "",
+                  "// Store user id for subsequent requests",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('orgUserId', body.id);",
+                  "    console.log('orgUserId stored: ' + body.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Org User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users/{{orgUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users",
+                "{{orgUserId}}"
+              ]
+            },
+            "description": "Returns a single user by ID. Returns 403 if the user belongs to a different organization (cross-org isolation).\n\n### Response `200 OK`\n```json\n{\n  \"id\": \"uuid\",\n  \"email\": \"viewer@example.com\",\n  \"role\": \"viewer\",\n  \"org_id\": \"uuid\",\n  \"is_active\": true,\n  \"created_at\": \"...\",\n  \"updated_at\": \"...\"\n}\n```"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has user details', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('id');",
+                  "    pm.expect(body).to.have.property('email');",
+                  "    pm.expect(body).to.have.property('role');",
+                  "    pm.expect(body).to.have.property('org_id');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Org User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users/{{orgUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users",
+                "{{orgUserId}}"
+              ]
+            },
+            "description": "Updates a user in the authenticated admin's organization. Currently supports toggling `is_active`.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `is_active` | boolean | ✓ |\n\n### Response `200 OK`\nReturns the updated user object."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('User is updated', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('is_active');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Org User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users/{{orgUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users",
+                "{{orgUserId}}"
+              ]
+            },
+            "description": "Deletes a viewer user from the authenticated admin's organization. Cannot delete org_admin users.\n\n### Response `204 No Content`\nEmpty body.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 403 | `FORBIDDEN` | Attempting to delete an org_admin |\n| 403 | `FORBIDDEN` | User belongs to a different organization |\n| 404 | `NOT_FOUND` | User not found |"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "⚙️ Workflow — Full Auth Lifecycle",
       "description": "Run these requests **in order** to walk through the complete token lifecycle:\n\n1. **Login** → stores `accessToken` + `refreshToken`\n2. **Refresh Tokens** → rotates both tokens\n3. **Logout** → revokes the session\n4. **[Verify] Refresh after logout** → confirms `TOKEN_REVOKED`\n\nThis folder is intended for exploratory/manual testing and onboarding. Use the Runner to execute all four in sequence.",
       "item": [
         {
           "name": "Step 1 — Login",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "login"
+              ]
             },
             "description": "Step 1 of the full auth lifecycle. Stores tokens automatically."
           },
@@ -1124,18 +2207,37 @@
         {
           "name": "Step 2 — Refresh Tokens",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "auth", "refresh"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "refresh"
+              ]
             },
             "description": "Step 2 of the full auth lifecycle. Rotates both tokens."
           },
@@ -1163,19 +2265,42 @@
           "request": {
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "auth", "logout"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "logout"
+              ]
             },
             "description": "Step 3 of the full auth lifecycle. Revokes the current refresh token."
           },
@@ -1202,18 +2327,37 @@
         {
           "name": "Step 4 — [Verify] Refresh after logout → 401",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{_revokedRefreshToken}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/auth/refresh",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "auth", "refresh"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "refresh"
+              ]
             },
             "description": "Step 4 of the full auth lifecycle. Confirms the refresh token was revoked on logout."
           },
@@ -1234,6 +2378,467 @@
                   "// Clean up temp variables",
                   "pm.collectionVariables.unset('_revokedRefreshToken');",
                   "pm.collectionVariables.unset('_logoutRefreshToken');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cameras",
+      "description": "Camera management endpoints. Org Admins can create, update, and delete cameras. All org users (including viewers) can list and view cameras.",
+      "item": [
+        {
+          "name": "Create Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Front Door Camera\",\n  \"location\": \"Main Entrance\",\n  \"timezone\": \"UTC\",\n  \"rtsp_url\": \"rtsp://192.168.1.100:554/stream1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras"
+              ]
+            },
+            "description": "Create a new camera and provision a KVS stream.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Camera name (1-255 chars) |\n| `location` | string | No | Physical location |\n| `timezone` | string | No | IANA timezone (default: UTC) |\n| `rtsp_url` | string | No | RTSP stream URL (encrypted at rest via KMS) |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test('Response has camera fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('id');",
+                  "    pm.expect(body).to.have.property('org_id');",
+                  "    pm.expect(body).to.have.property('name');",
+                  "    pm.expect(body).to.have.property('kvs_stream_name');",
+                  "    pm.expect(body).to.have.property('status');",
+                  "    pm.expect(body.is_active).to.be.true;",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('cameraId', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List Cameras",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "List all active cameras for the authenticated user's organization.\n\n**Auth:** `requireUser` (viewers and org admins)\n\n**Caching:** Redis-cached with 2-min TTL. Cache invalidated on create/update/delete.\n\n### Query Parameters\n| Param | Type | Default | Description |\n|-------|------|---------|-------------|\n| `page` | integer | 1 | Page number |\n| `limit` | integer | 20 | Items per page (max 100) |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has paginated data', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('data');",
+                  "    pm.expect(body.data).to.be.an('array');",
+                  "    pm.expect(body).to.have.property('pagination');",
+                  "    pm.expect(body.pagination).to.have.property('page');",
+                  "    pm.expect(body.pagination).to.have.property('limit');",
+                  "    pm.expect(body.pagination).to.have.property('total');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}"
+              ]
+            },
+            "description": "Get a single camera by ID. Returns decrypted RTSP URL if set.\n\n**Auth:** `requireUser` (viewers and org admins)\n\nReturns 403 if the camera belongs to a different organization."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has camera details', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('id');",
+                  "    pm.expect(body).to.have.property('name');",
+                  "    pm.expect(body).to.have.property('kvs_stream_name');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Download Camera Credentials",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}/credentials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}",
+                "credentials"
+              ]
+            },
+            "description": "Download IoT credentials for a camera. One-time download — returns 409 if already issued."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"iotCredentialEndpoint\", body.iot_credential_endpoint);",
+                  "    pm.collectionVariables.set(\"kvsStreamName\", body.kvs_stream_name);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Camera Name\",\n  \"location\": \"Lobby\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}"
+              ]
+            },
+            "description": "Update camera properties (name, location, timezone, rtsp_url).\n\n**Auth:** `requireOrgAdmin`\n\nAt least one field must be provided. RTSP URL is re-encrypted on update."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Camera name is updated', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.name).to.equal('Updated Camera Name');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Delete Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}"
+              ]
+            },
+            "description": "Deactivate a camera and delete its KVS stream.\n\n**Auth:** `requireOrgAdmin`\n\nSoft-deletes (sets `is_active = false`, `status = inactive`). KVS stream is deleted."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin / Cameras",
+      "description": "Super Admin camera management. View all cameras across all organizations.",
+      "item": [
+        {
+          "name": "List All Cameras",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/cameras?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "cameras"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "org_id",
+                  "value": "",
+                  "description": "Optional: filter by organization ID",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all cameras across all organizations (super admin only).\n\n**Auth:** `requireSuperAdmin`\n\n### Query Parameters\n| Param | Type | Default | Description |\n|-------|------|---------|-------------|\n| `page` | integer | 1 | Page number |\n| `limit` | integer | 20 | Items per page (max 100) |\n| `org_id` | uuid | — | Optional org filter |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has paginated data', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('data');",
+                  "    pm.expect(body.data).to.be.an('array');",
+                  "    pm.expect(body).to.have.property('pagination');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Internal",
+      "description": "Internal webhook endpoints. Authenticated via `x-internal-secret` header (not JWT). Used by Lambda functions and other internal services.",
+      "item": [
+        {
+          "name": "Update Camera Status",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-secret",
+                "value": "{{internalApiSecret}}",
+                "description": "Shared secret for internal service auth"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kvs_stream_name\": \"org-id-camera-id\",\n  \"status\": \"online\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/cameras/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "cameras",
+                "status"
+              ]
+            },
+            "description": "Update the online/offline status of a camera via its KVS stream name.\n\n**Auth:** `x-internal-secret` header (shared secret, NOT JWT)\n\nCalled by Lambda when KVS stream connectivity changes.\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `kvs_stream_name` | string | Yes | KVS stream name (`{orgId}-{cameraId}`) |\n| `status` | string | Yes | `online` or `offline` |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response confirms update', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.equal('Status updated');",
+                  "});"
                 ]
               }
             }

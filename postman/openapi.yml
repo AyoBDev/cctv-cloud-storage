@@ -49,6 +49,16 @@ tags:
     description: Super admin organization management
   - name: Users
     description: Super admin user management
+  - name: Auth
+    description: Org user login, token refresh, logout, and change password
+  - name: Org Users
+    description: Org admin user management (org-scoped)
+  - name: Cameras
+    description: Camera management (org-scoped, Redis-cached)
+  - name: Admin Cameras
+    description: Super admin camera management (cross-org)
+  - name: Internal
+    description: Internal webhook endpoints (shared-secret auth)
 
 components:
   securitySchemes:
@@ -157,6 +167,82 @@ components:
         total:
           type: integer
           minimum: 0
+
+    OrgUser:
+      type: object
+      required: [id, email, role, org_id, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [org_admin, viewer]
+        org_id:
+          type: string
+          format: uuid
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PasswordChangeResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    Camera:
+      type: object
+      required: [id, org_id, name, timezone, kvs_stream_name, status, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        location:
+          type: string
+          nullable: true
+        timezone:
+          type: string
+        kvs_stream_name:
+          type: string
+          description: "KVS stream name ({orgId}-{cameraId})"
+        kvs_stream_arn:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [provisioning, online, offline, inactive]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CameraDetail:
+      allOf:
+        - $ref: "#/components/schemas/Camera"
+        - type: object
+          properties:
+            rtsp_url:
+              type: string
+              description: Decrypted RTSP URL (only on single camera GET)
 
     HealthCheck:
       type: object
@@ -707,6 +793,815 @@ paths:
                   message: Cannot delete a super admin
         "404":
           description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Org User Auth
+  # ─────────────────────────────────────────────────────────
+  /api/v1/auth/login:
+    post:
+      summary: Org user login
+      description: |
+        Authenticates an org user (org_admin or viewer) and returns an RS256 JWT access/refresh token pair.
+        Checks that both the user and their organization are active.
+      operationId: orgLogin
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+            example:
+              email: admin@acme.com
+              password: SecurePass123!
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_CREDENTIALS
+                  message: Invalid email or password
+        "403":
+          description: Account or organization deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: FORBIDDEN
+                  message: Organization is deactivated
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Refresh tokens
+      description: |
+        Exchanges a valid refresh token for a new access/refresh token pair.
+        The old refresh token is revoked (single-use rotation).
+      operationId: orgRefresh
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+            example:
+              refreshToken: eyJhbGciOiJSUzI1NiJ9...
+      responses:
+        "200":
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: Invalid, expired, or revoked refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/logout:
+    post:
+      summary: Org user logout
+      description: Revokes the refresh token. Requires a valid org user access token.
+      operationId: orgLogout
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+            example:
+              refreshToken: eyJhbGciOiJSUzI1NiJ9...
+      responses:
+        "204":
+          description: Logged out successfully
+        "401":
+          description: Missing or invalid access token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not an org user (e.g. super_admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/auth/change-password:
+    post:
+      summary: Change password
+      description: Changes the authenticated org user's own password.
+      operationId: changePassword
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                  minLength: 8
+                newPassword:
+                  type: string
+                  minLength: 8
+            example:
+              currentPassword: OldPass123!
+              newPassword: NewPass123!
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordChangeResponse"
+              example:
+                message: Password changed successfully
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing/invalid token or wrong current password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Org Users (Org Admin)
+  # ─────────────────────────────────────────────────────────
+  /api/v1/org/users:
+    get:
+      summary: List org users
+      description: Returns a paginated list of users in the authenticated admin's organization.
+      operationId: listOrgUsers
+      tags: [Org Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated org users
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrgUser"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: Create viewer user
+      description: Creates a new viewer user in the authenticated admin's organization.
+      operationId: createOrgUser
+      tags: [Org Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+            example:
+              email: viewer@acme.com
+              password: ViewerPass123!
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgUser"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: CONFLICT
+                  message: Email already exists
+
+  /api/v1/org/users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get org user
+      description: |
+        Retrieves a single user by UUID. Returns 403 if the user belongs to
+        a different organization (cross-org isolation).
+      operationId: getOrgUser
+      tags: [Org Users]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgUser"
+        "403":
+          description: Access denied — user belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: Update org user
+      description: Updates a user's active status within the authenticated admin's organization.
+      operationId: updateOrgUser
+      tags: [Org Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_active]
+              properties:
+                is_active:
+                  type: boolean
+            example:
+              is_active: false
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgUser"
+        "403":
+          description: Access denied — user belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Delete org user
+      description: |
+        Permanently deletes a viewer user. Cannot delete org_admin users.
+        Returns 403 if the user belongs to a different organization.
+      operationId: deleteOrgUser
+      tags: [Org Users]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: User deleted
+        "403":
+          description: Cannot delete org_admin or user from another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: FORBIDDEN
+                  message: Cannot delete an org admin
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Cameras (Org-scoped)
+  # ─────────────────────────────────────────────────────────
+  /api/v1/cameras:
+    get:
+      summary: List cameras
+      description: |
+        Returns a paginated list of active cameras for the authenticated user's organization.
+        Redis-cached with 2-min TTL. Cache invalidated on create/update/delete.
+      operationId: listCameras
+      tags: [Cameras]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated cameras
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Camera"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org user required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: Create camera
+      description: |
+        Creates a new camera and provisions a KVS stream.
+        RTSP URL is encrypted at rest via KMS.
+      operationId: createCamera
+      tags: [Cameras]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                location:
+                  type: string
+                  maxLength: 255
+                timezone:
+                  type: string
+                  maxLength: 50
+                  description: IANA timezone (default UTC)
+                rtsp_url:
+                  type: string
+                  format: uri
+                  description: RTSP stream URL (encrypted at rest)
+            example:
+              name: Front Door Camera
+              location: Main Entrance
+              timezone: UTC
+              rtsp_url: "rtsp://192.168.1.100:554/stream1"
+      responses:
+        "201":
+          description: Camera created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Camera"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/cameras/{cameraId}:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get camera
+      description: |
+        Retrieves a single camera by UUID. Returns decrypted RTSP URL if set.
+        Returns 403 if the camera belongs to a different organization.
+      operationId: getCamera
+      tags: [Cameras]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Camera details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CameraDetail"
+        "403":
+          description: Access denied — camera belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: Update camera
+      description: |
+        Updates camera properties (name, location, timezone, rtsp_url).
+        At least one field must be provided. RTSP URL is re-encrypted on update.
+      operationId: updateCamera
+      tags: [Cameras]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                location:
+                  type: string
+                  maxLength: 255
+                timezone:
+                  type: string
+                  maxLength: 50
+                rtsp_url:
+                  type: string
+                  format: uri
+            example:
+              name: Updated Camera Name
+              location: Lobby
+      responses:
+        "200":
+          description: Camera updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Camera"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Access denied — camera belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Deactivate camera
+      description: |
+        Soft-deletes the camera (sets is_active=false, status=inactive) and deletes its KVS stream.
+      operationId: deactivateCamera
+      tags: [Cameras]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Camera deactivated
+        "403":
+          description: Access denied — camera belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/cameras/{cameraId}/credentials:
+    get:
+      summary: Download camera IoT credentials
+      description: >
+        Generate and download IoT certificates for a camera.
+        One-time download — returns 409 if credentials were already issued.
+      tags:
+        - Cameras
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cameraId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Credential bundle
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_cert:
+                    type: string
+                    description: Device certificate PEM
+                  private_key:
+                    type: string
+                    description: Private key PEM
+                  root_ca_url:
+                    type: string
+                    description: URL to download Amazon Root CA
+                  iot_credential_endpoint:
+                    type: string
+                    description: IoT credential provider endpoint
+                  kvs_stream_name:
+                    type: string
+                    description: KVS stream name for this camera
+                  role_alias:
+                    type: string
+                    description: IoT role alias name
+                  region:
+                    type: string
+                    description: AWS region
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — wrong org or not org_admin
+        '404':
+          description: Camera not found
+        '409':
+          description: Credentials already issued
+
+  # ─────────────────────────────────────────────────────────
+  # Admin Cameras (Super Admin)
+  # ─────────────────────────────────────────────────────────
+  /api/v1/admin/cameras:
+    get:
+      summary: List all cameras (cross-org)
+      description: Returns a paginated list of all cameras across all organizations. Optionally filter by org_id.
+      operationId: listAllCameras
+      tags: [Admin Cameras]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: org_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Optional organization filter
+      responses:
+        "200":
+          description: Paginated cameras
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Camera"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — super admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Internal Webhooks
+  # ─────────────────────────────────────────────────────────
+  /internal/cameras/status:
+    post:
+      summary: Update camera status
+      description: |
+        Updates the online/offline status of a camera via its KVS stream name.
+        Authenticated via `x-internal-secret` header (shared secret, NOT JWT).
+        Called by Lambda when KVS stream connectivity changes.
+      operationId: updateCameraStatus
+      tags: [Internal]
+      security: []
+      parameters:
+        - name: x-internal-secret
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret for internal service auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kvs_stream_name, status]
+              properties:
+                kvs_stream_name:
+                  type: string
+                  description: "KVS stream name ({orgId}-{cameraId})"
+                status:
+                  type: string
+                  enum: [online, offline]
+            example:
+              kvs_stream_name: org-id-camera-id
+              status: online
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Status updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or missing internal secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
           content:
             application/json:
               schema:
