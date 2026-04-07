@@ -121,21 +121,32 @@ export async function issueCredentials(
   const { certificateId, certificateArn, certificatePem } = certResult;
   const privateKey = certResult.keyPair.PrivateKey;
 
-  // 2. Attach IoT policy to cert
-  await iot.send(
-    new AttachPolicyCommand({
-      policyName,
-      target: certificateArn,
-    }),
-  );
+  try {
+    // 2. Attach IoT policy to cert
+    await iot.send(
+      new AttachPolicyCommand({
+        policyName,
+        target: certificateArn,
+      }),
+    );
 
-  // 3. Attach cert to Thing
-  await iot.send(
-    new AttachThingPrincipalCommand({
-      thingName,
-      principal: certificateArn,
-    }),
-  );
+    // 3. Attach cert to Thing
+    await iot.send(
+      new AttachThingPrincipalCommand({
+        thingName,
+        principal: certificateArn,
+      }),
+    );
+  } catch (err) {
+    // Rollback: revoke and delete the orphaned certificate
+    await iot.send(
+      new UpdateCertificateCommand({ certificateId, newStatus: 'INACTIVE' }),
+    );
+    await iot.send(
+      new DeleteCertificateCommand({ certificateId, forceDelete: true }),
+    );
+    throw err;
+  }
 
   return { certificateId, certificateArn, certificatePem, privateKey };
 }

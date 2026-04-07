@@ -303,10 +303,11 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
         id: string;
         org_id: string;
         iot_thing_name: string | null;
+        kvs_stream_name: string;
         credentials_issued: boolean;
         is_active: boolean;
       }>>`
-        SELECT id, org_id, iot_thing_name, credentials_issued, is_active
+        SELECT id, org_id, iot_thing_name, kvs_stream_name, credentials_issued, is_active
         FROM cameras
         WHERE id = ${params.cameraId} AND is_active = true
       `;
@@ -346,7 +347,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
         private_key: creds.privateKey,
         root_ca_url: 'https://www.amazontrust.com/repository/AmazonRootCA1.pem',
         iot_credential_endpoint: endpoint,
-        kvs_stream_name: camera.iot_thing_name,
+        kvs_stream_name: camera.kvs_stream_name,
         role_alias: env.IOT_ROLE_ALIAS,
         region: env.AWS_REGION,
       });
