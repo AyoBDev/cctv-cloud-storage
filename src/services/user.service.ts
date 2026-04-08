@@ -61,11 +61,7 @@ export async function getUserById(db: Sql, userId: string): Promise<User> {
   return user;
 }
 
-export async function updateUserStatus(
-  db: Sql,
-  userId: string,
-  isActive: boolean,
-): Promise<User> {
+export async function updateUserStatus(db: Sql, userId: string, isActive: boolean): Promise<User> {
   const rows = await db<User[]>`
     UPDATE users
     SET is_active = ${isActive}

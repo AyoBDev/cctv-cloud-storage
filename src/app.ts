@@ -12,10 +12,12 @@ import redisPlugin from '@plugins/redis';
 import rateLimitPlugin from '@plugins/rate-limit';
 import postgresPlugin from '@plugins/postgres';
 import jwtPlugin from '@plugins/jwt';
+import awsPlugin from '@plugins/aws';
 
 // Routes
 import healthRoute from '@routes/health';
 import apiRoutes from '@routes/index';
+import internalCameraRoutes from '@routes/internal/cameras/index';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -45,10 +47,12 @@ export function buildApp(): FastifyInstance {
   void app.register(rateLimitPlugin);
   void app.register(postgresPlugin);
   void app.register(jwtPlugin);
+  void app.register(awsPlugin);
 
   // Routes
   void app.register(healthRoute);
   void app.register(apiRoutes, { prefix: '/api/v1' });
+  void app.register(internalCameraRoutes, { prefix: '/internal/cameras' });
 
   // Global error handler — { error: { code, message } } shape
   app.setErrorHandler<FastifyError>((err, _request, reply) => {

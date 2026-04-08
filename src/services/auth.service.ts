@@ -1,6 +1,7 @@
 import type { Sql } from 'postgres';
 import type { Redis } from 'ioredis';
 import { comparePassword } from '@utils/password';
+import { hashPassword } from '@utils/password';
 import { signAccessToken, signRefreshToken, verifyToken } from '@utils/jwt';
 import type { RefreshTokenPayload } from '@utils/jwt';
 import { AppError, ErrorCodes } from '@utils/errors';
@@ -53,6 +54,65 @@ export async function loginSuperAdmin(
   }
 
   return issueTokenPair(redis, user);
+}
+
+export async function loginOrgUser(
+  db: Sql,
+  redis: Redis,
+  email: string,
+  password: string,
+): Promise<TokenPair> {
+  const rows = await db<(User & { org_is_active: boolean })[]>`
+    SELECT u.id, u.email, u.password_hash, u.role, u.org_id, u.is_active,
+           o.is_active AS org_is_active
+    FROM users u
+    JOIN organizations o ON o.id = u.org_id
+    WHERE u.email = ${email} AND u.role IN ('org_admin', 'viewer')
+  `;
+
+  const user = rows[0];
+  if (!user) {
+    throw AppError.invalidCredentials();
+  }
+
+  if (!user.is_active) {
+    throw AppError.forbidden('Account is deactivated');
+  }
+
+  if (!user.org_is_active) {
+    throw AppError.forbidden('Organization is deactivated');
+  }
+
+  const valid = await comparePassword(password, user.password_hash);
+  if (!valid) {
+    throw AppError.invalidCredentials();
+  }
+
+  return issueTokenPair(redis, user);
+}
+
+export async function changePassword(
+  db: Sql,
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const rows = await db<User[]>`
+    SELECT id, password_hash FROM users WHERE id = ${userId}
+  `;
+
+  const user = rows[0];
+  if (!user) {
+    throw AppError.notFound('User not found');
+  }
+
+  const valid = await comparePassword(currentPassword, user.password_hash);
+  if (!valid) {
+    throw AppError.invalidCredentials();
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await db`UPDATE users SET password_hash = ${newHash} WHERE id = ${userId}`;
 }
 
 export async function refreshTokens(db: Sql, redis: Redis, token: string): Promise<TokenPair> {

@@ -161,6 +161,14 @@ resource "aws_ecs_task_definition" "api" {
       {
         name      = "INTERNAL_API_SECRET"
         valueFrom = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${local.ssm_prefix}/internal-api-secret"
+      },
+      {
+        name      = "IOT_POLICY_NAME"
+        valueFrom = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${local.ssm_prefix}/iot-policy-name"
+      },
+      {
+        name      = "IOT_ROLE_ALIAS"
+        valueFrom = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${local.ssm_prefix}/iot-role-alias"
       }
     ]
 

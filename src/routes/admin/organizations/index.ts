@@ -20,7 +20,10 @@ const orgIdParamsSchema = z.object({
 
 const createOrgBodySchema = z.object({
   name: z.string().min(1).max(255),
-  slug: z.string().regex(/^[a-z0-9-]+$/).max(100),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(100),
   adminEmail: z.string().email(),
   adminPassword: z.string().min(8),
 });
@@ -28,7 +31,11 @@ const createOrgBodySchema = z.object({
 const updateOrgBodySchema = z
   .object({
     name: z.string().min(1).max(255).optional(),
-    slug: z.string().regex(/^[a-z0-9-]+$/).max(100).optional(),
+    slug: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(100)
+      .optional(),
     is_active: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {

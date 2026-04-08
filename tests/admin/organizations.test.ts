@@ -33,7 +33,10 @@ describe('Admin Organizations', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ data: unknown[]; pagination: { page: number; limit: number; total: number } }>();
+      const body = res.json<{
+        data: unknown[];
+        pagination: { page: number; limit: number; total: number };
+      }>();
       expect(Array.isArray(body.data)).toBe(true);
       expect(body.pagination).toHaveProperty('page');
       expect(body.pagination).toHaveProperty('limit');

@@ -49,7 +49,10 @@ describe('Admin Users', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ data: unknown[]; pagination: { page: number; limit: number; total: number } }>();
+      const body = res.json<{
+        data: unknown[];
+        pagination: { page: number; limit: number; total: number };
+      }>();
       expect(Array.isArray(body.data)).toBe(true);
       expect(body.pagination.total).toBeGreaterThan(0);
     });
@@ -254,19 +257,14 @@ describe('Admin Users', () => {
     });
 
     it('returns 403 when trying to delete a super_admin', async () => {
-      // Get the super_admin user id by listing users (seed admin is super_admin)
-      const usersRes = await app.inject({
-        method: 'GET',
-        url: '/api/v1/admin/users?limit=100',
-        headers: { authorization: `Bearer ${accessToken}` },
-      });
-      const usersBody = usersRes.json<{ data: Array<{ id: string; role: string }> }>();
-      const superAdmin = usersBody.data.find((u) => u.role === 'super_admin');
-      if (!superAdmin) throw new Error('No super_admin found');
+      // Decode the access token to get the super_admin user id
+      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1]!, 'base64').toString()) as {
+        sub: string;
+      };
 
       const res = await app.inject({
         method: 'DELETE',
-        url: `/api/v1/admin/users/${superAdmin.id}`,
+        url: `/api/v1/admin/users/${payload.sub}`,
         headers: { authorization: `Bearer ${accessToken}` },
       });
 
