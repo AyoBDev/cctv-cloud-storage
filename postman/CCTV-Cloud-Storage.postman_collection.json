@@ -898,7 +898,7 @@
                 "organizations"
               ]
             },
-            "description": "Creates a new organisation along with an `org_admin` user in a single transaction. If the user INSERT fails (e.g. duplicate email), the entire transaction rolls back.\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `name` | string | ✓ | 1–255 chars |\n| `slug` | string | ✓ | `[a-z0-9-]+`, max 100 chars, unique |\n| `adminEmail` | string | ✓ | Valid email, unique |\n| `adminPassword` | string | ✓ | Min 8 chars |\n\n### Response `201 Created`\nReturns the created organisation object (no user details).\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid slug format, missing fields |\n| 409 | `CONFLICT` | Slug or admin email already taken |"
+            "description": "Creates a new organisation along with an `org_admin` user in a single transaction. If the user INSERT fails (e.g. duplicate email), the entire transaction rolls back.\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `name` | string | ✓ | 1–255 chars |\n| `slug` | string | | `[a-z0-9-]+`, max 100 chars, unique. Optional — auto-generated from org name if not provided. |\n| `adminEmail` | string | ✓ | Valid email, unique |\n| `adminPassword` | string | ✓ | Min 8 chars |\n\n### Response `201 Created`\nReturns the created organisation object (no user details).\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid slug format, missing fields |\n| 409 | `CONFLICT` | Slug or admin email already taken |"
           },
           "response": [
             {
@@ -2412,7 +2412,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Front Door Camera\",\n  \"location\": \"Main Entrance\",\n  \"timezone\": \"UTC\",\n  \"rtsp_url\": \"rtsp://192.168.1.100:554/stream1\"\n}",
+              "raw": "{\n  \"name\": \"Front Door Camera\",\n  \"slug\": \"front-door\",\n  \"location\": \"Main Entrance\",\n  \"timezone\": \"UTC\",\n  \"rtsp_url\": \"rtsp://192.168.1.100:554/stream1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2430,7 +2430,7 @@
                 "cameras"
               ]
             },
-            "description": "Create a new camera and provision a KVS stream + IoT Thing.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Camera name (1-255 chars) |\n| `location` | string | No | Physical location |\n| `timezone` | string | No | IANA timezone (default: UTC) |\n| `rtsp_url` | string | No | RTSP stream URL (encrypted at rest via KMS) |\n\n### Response\nCamera status starts as `provisioning`. It transitions to `online` when the device starts streaming (via internal webhook)."
+            "description": "Create a new camera and provision a KVS stream + IoT Thing.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Camera name (1-255 chars) |\n| `slug` | string | No | URL-friendly identifier. Lowercase alphanumeric + hyphens (`[a-z0-9-]+`). Auto-generated as `cam1`, `cam2`, etc. if not provided. Must be unique within the org. |\n| `location` | string | No | Physical location |\n| `timezone` | string | No | IANA timezone (default: UTC) |\n| `rtsp_url` | string | No | RTSP stream URL (encrypted at rest via KMS) |\n\n### Response\nCamera status starts as `provisioning`. It transitions to `online` when the device starts streaming (via internal webhook).\n\nThe `kvs_stream_name` is built as `{orgSlug}-{cameraSlug}` (e.g. `acme-corp-front-door` or `acme-corp-cam1`)."
           },
           "event": [
             {
@@ -2445,6 +2445,7 @@
                   "    pm.expect(body).to.have.property('id');",
                   "    pm.expect(body).to.have.property('org_id');",
                   "    pm.expect(body).to.have.property('name');",
+                  "    pm.expect(body).to.have.property('slug');",
                   "    pm.expect(body).to.have.property('kvs_stream_name');",
                   "    pm.expect(body).to.have.property('status');",
                   "    pm.expect(body.status).to.equal('provisioning');",
