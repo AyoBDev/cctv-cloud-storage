@@ -132,7 +132,7 @@ export async function createCamera(
   // Create IoT Thing (skip in test)
   if (!isTestEnv()) {
     try {
-      await createIoTThing(iot, streamName);
+      await createIoTThing(iot, streamName, env.IOT_THING_TYPE);
       iotThingName = streamName;
     } catch (err) {
       // Rollback: delete KVS stream + DB row

@@ -18,12 +18,16 @@ const isTestEnv = () => env.NODE_ENV === 'test';
 
 let cachedEndpoint: string | null = null;
 
-export async function createIoTThing(iot: IoTClient, thingName: string): Promise<string> {
+export async function createIoTThing(
+  iot: IoTClient,
+  thingName: string,
+  thingTypeName: string,
+): Promise<string> {
   if (isTestEnv()) {
     return `arn:aws:iot:eu-west-2:000000000000:thing/${thingName}`;
   }
 
-  const result = await iot.send(new CreateThingCommand({ thingName }));
+  const result = await iot.send(new CreateThingCommand({ thingName, thingTypeName }));
 
   if (!result.thingArn) {
     throw new Error('CreateThing returned no ARN');
