@@ -54,7 +54,7 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-def.json
-          container-name: cctv-staging-api
+          container-name: api
           image: ${{ steps.build.outputs.image }}
 
       - name: Register new task definition & deploy
