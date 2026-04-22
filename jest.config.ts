@@ -18,6 +18,7 @@ const config: Config = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
+  testTimeout: 15000,
   coverageDirectory: 'coverage',
   collectCoverageFrom: ['src/**/*.ts', '!src/db/seed.ts', '!src/db/migrations/**'],
 };

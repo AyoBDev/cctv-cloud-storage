@@ -14,7 +14,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "test:ci": "npm test -- --forceExit --coverage",
+    "test:ci": "npm test -- --runInBand --forceExit --coverage",
     "migrate": "node-pg-migrate up --migrations-dir src/db/migrations --tsconfig tsconfig.json --tsx",
     "migrate:down": "node-pg-migrate down --migrations-dir src/db/migrations --tsconfig tsconfig.json --tsx",
     "seed": "tsx src/db/seed.ts"
