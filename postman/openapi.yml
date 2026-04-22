@@ -202,7 +202,7 @@ components:
 
     Camera:
       type: object
-      required: [id, org_id, name, timezone, kvs_stream_name, status, is_active, created_at, updated_at]
+      required: [id, org_id, name, slug, timezone, kvs_stream_name, status, is_active, created_at, updated_at]
       properties:
         id:
           type: string
@@ -212,6 +212,10 @@ components:
           format: uuid
         name:
           type: string
+        slug:
+          type: string
+          pattern: ^[a-z0-9-]+$
+          description: "Camera slug (e.g. front-door, cam1). Auto-generated if not provided."
         location:
           type: string
           nullable: true
@@ -219,7 +223,7 @@ components:
           type: string
         kvs_stream_name:
           type: string
-          description: "KVS stream name ({orgId}-{cameraId})"
+          description: "KVS stream name ({orgSlug}-{cameraSlug}, e.g. acme-front-door)"
         kvs_stream_arn:
           type: string
           nullable: true
@@ -481,6 +485,7 @@ paths:
       summary: Create organization
       description: |
         Creates a new organization and its first org_admin user in a single transaction.
+        The `slug` field is optional — if omitted, auto-generated from the org name.
         Both the org slug and admin email must be unique.
       operationId: createOrganization
       tags: [Organizations]
@@ -492,7 +497,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, slug, adminEmail, adminPassword]
+              required: [name, adminEmail, adminPassword]
               properties:
                 name:
                   type: string
@@ -502,7 +507,7 @@ paths:
                   type: string
                   maxLength: 100
                   pattern: ^[a-z0-9-]+$
-                  description: Unique URL-safe slug
+                  description: "Unique URL-safe slug. Optional — auto-generated from org name if not provided."
                 adminEmail:
                   type: string
                   format: email
@@ -1244,7 +1249,9 @@ paths:
     post:
       summary: Create camera
       description: |
-        Creates a new camera and provisions a KVS stream.
+        Creates a new camera, provisions a KVS stream and IoT Thing.
+        The `slug` field is optional — if omitted, auto-generates as `cam1`, `cam2`, etc.
+        The KVS stream name is built as `{orgSlug}-{cameraSlug}` (e.g. `acme-front-door`).
         RTSP URL is encrypted at rest via KMS.
       operationId: createCamera
       tags: [Cameras]
@@ -1262,6 +1269,11 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 255
+                slug:
+                  type: string
+                  maxLength: 100
+                  pattern: ^[a-z0-9-]+$
+                  description: "Camera slug (lowercase alphanumeric + hyphens). Auto-generated as cam1, cam2, etc. if not provided."
                 location:
                   type: string
                   maxLength: 255
@@ -1275,6 +1287,7 @@ paths:
                   description: RTSP stream URL (encrypted at rest)
             example:
               name: Front Door Camera
+              slug: front-door
               location: Main Entrance
               timezone: UTC
               rtsp_url: "rtsp://192.168.1.100:554/stream1"
@@ -1303,6 +1316,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: Camera slug already taken in this organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: CONFLICT
+                  message: Camera slug already taken in this organization
 
   /api/v1/cameras/{cameraId}:
     parameters:
@@ -1569,12 +1592,12 @@ paths:
               properties:
                 kvs_stream_name:
                   type: string
-                  description: "KVS stream name ({orgId}-{cameraId})"
+                  description: "KVS stream name ({orgSlug}-{cameraSlug})"
                 status:
                   type: string
                   enum: [online, offline]
             example:
-              kvs_stream_name: org-id-camera-id
+              kvs_stream_name: acme-front-door
               status: online
       responses:
         "200":
