@@ -21,6 +21,7 @@ import internalCameraRoutes from '@routes/internal/cameras/index';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
+    pluginTimeout: 30000,
     logger: {
       level: env.LOG_LEVEL,
       ...(env.NODE_ENV === 'development'
