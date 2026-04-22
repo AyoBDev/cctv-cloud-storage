@@ -12,3 +12,8 @@ output "iot_role_arn" {
   description = "ARN of the IAM role used by IoT credential provider"
   value       = aws_iam_role.camera_iot.arn
 }
+
+output "iot_thing_type_name" {
+  description = "Name of the IoT Thing Type for camera devices"
+  value       = aws_iot_thing_type.ip_camera.name
+}

@@ -1,4 +1,12 @@
 # ---------------------------------------------------------------------------
+# IoT Thing Type
+# (shared classification for all camera devices)
+# ---------------------------------------------------------------------------
+resource "aws_iot_thing_type" "ip_camera" {
+  name = "IPCamera"
+}
+
+# ---------------------------------------------------------------------------
 # IAM Role for IoT Credential Provider
 # (assumed by IoT devices via certificate auth to get temporary KVS credentials)
 # ---------------------------------------------------------------------------
@@ -39,8 +47,9 @@ resource "aws_iam_role_policy" "camera_iot_kvs" {
 # (maps the IAM role to IoT credential provider)
 # ---------------------------------------------------------------------------
 resource "aws_iot_role_alias" "camera" {
-  alias    = "${var.project}-${var.environment}-camera-iot-role-alias"
-  role_arn = aws_iam_role.camera_iot.arn
+  alias               = "${var.project}-${var.environment}-camera-iot-role-alias"
+  role_arn            = aws_iam_role.camera_iot.arn
+  credential_duration = 3600
 }
 
 # ---------------------------------------------------------------------------
