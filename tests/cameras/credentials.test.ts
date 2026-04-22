@@ -72,7 +72,7 @@ describe('Camera Credentials', () => {
       expect(body.private_key).toContain('BEGIN RSA PRIVATE KEY');
       expect(body.root_ca_url).toContain('amazontrust.com');
       expect(body.iot_credential_endpoint).toBeTruthy();
-      expect(body.kvs_stream_name).toContain(orgId);
+      expect(body.kvs_stream_name).toMatch(/^[a-z0-9-]+-cam\d+$/);
       expect(body.role_alias).toBeTruthy();
       expect(body.region).toBeTruthy();
     });

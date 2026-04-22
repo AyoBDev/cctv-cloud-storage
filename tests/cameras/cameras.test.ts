@@ -57,6 +57,7 @@ describe('Cameras', () => {
         id: string;
         org_id: string;
         name: string;
+        slug: string;
         location: string;
         timezone: string;
         kvs_stream_name: string;
@@ -67,7 +68,9 @@ describe('Cameras', () => {
       expect(body.location).toBe('Main Entrance');
       expect(body.timezone).toBe('America/New_York');
       expect(body.org_id).toBe(orgId);
-      expect(body.kvs_stream_name).toContain(orgId);
+      expect(body.slug).toMatch(/^cam\d+$/);
+      expect(body.kvs_stream_name).toContain(body.slug);
+      expect(body.kvs_stream_name).toMatch(/^[a-z0-9-]+-cam\d+$/);
       expect(body.status).toBe('provisioning');
       expect(body.is_active).toBe(true);
     });
@@ -103,6 +106,63 @@ describe('Cameras', () => {
       const body = res.json<Record<string, unknown>>();
       expect(body).not.toHaveProperty('rtsp_url');
       expect(body).not.toHaveProperty('rtsp_url_encrypted');
+    });
+
+    it('creates a camera with user-provided slug', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/cameras',
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: {
+          name: 'Custom Slug Camera',
+          slug: 'front-door',
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ slug: string; kvs_stream_name: string }>();
+      expect(body.slug).toBe('front-door');
+      expect(body.kvs_stream_name).toContain('front-door');
+    });
+
+    it('returns 409 on duplicate slug within same org', async () => {
+      // First create with the slug
+      await app.inject({
+        method: 'POST',
+        url: '/api/v1/cameras',
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: {
+          name: 'First Camera',
+          slug: 'duplicate-test',
+        },
+      });
+
+      // Try to create another with the same slug
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/cameras',
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: {
+          name: 'Another Camera',
+          slug: 'duplicate-test',
+        },
+      });
+
+      expect(res.statusCode).toBe(409);
+    });
+
+    it('returns 400 on invalid slug format', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/cameras',
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: {
+          name: 'Bad Slug Camera',
+          slug: 'UPPER_CASE!',
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
     });
 
     it('returns 400 on missing name', async () => {
