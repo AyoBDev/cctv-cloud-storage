@@ -32,6 +32,7 @@ const envSchema = z.object({
   KMS_KEY_ID: z.string().default(''),
   IOT_POLICY_NAME: z.string().default(''),
   IOT_ROLE_ALIAS: z.string().default('camera-iot-role-alias'),
+  IOT_THING_TYPE: z.string().default('IPCamera'),
 });
 
 function parseEnv() {
