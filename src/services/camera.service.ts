@@ -159,7 +159,7 @@ export async function createCamera(
         kvs_stream_arn = ${streamArn},
         iot_thing_name = ${iotThingName},
         rtsp_url_encrypted = ${encryptedUrl},
-        status = 'online'
+        status = 'provisioning'
     WHERE id = ${camera.id}
     RETURNING *
   `;
