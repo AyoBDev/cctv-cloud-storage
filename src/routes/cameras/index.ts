@@ -87,7 +87,13 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
     },
     async (request, reply) => {
       const body = createCameraBodySchema.parse(request.body);
-      const data: { name: string; slug?: string; location?: string; timezone?: string; rtsp_url?: string } = {
+      const data: {
+        name: string;
+        slug?: string;
+        location?: string;
+        timezone?: string;
+        rtsp_url?: string;
+      } = {
         name: body.name,
       };
       if (body.slug !== undefined) data.slug = body.slug;

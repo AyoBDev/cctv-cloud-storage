@@ -115,7 +115,12 @@ export default async function organizationRoutes(app: FastifyInstance): Promise<
     },
     async (request, reply) => {
       const body = createOrgBodySchema.parse(request.body);
-      const slug = body.slug ?? body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const slug =
+        body.slug ??
+        body.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
       const org = await createOrganizationWithAdmin(app.db, {
         name: body.name,
         slug,

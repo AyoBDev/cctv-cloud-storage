@@ -5,7 +5,6 @@ import type { FastifyInstance } from 'fastify';
 describe('Camera Credentials', () => {
   let app: FastifyInstance;
   let superAdminToken: string;
-  let orgId: string;
   let orgAdminAccessToken: string;
   let viewerAccessToken: string;
   let cameraId: string;
@@ -15,7 +14,6 @@ describe('Camera Credentials', () => {
     superAdminToken = await loginAsSuperAdmin(app);
 
     const org = await createOrgAndLogin(app, superAdminToken, 'creds');
-    orgId = org.orgId;
     orgAdminAccessToken = org.orgAdminAccessToken;
 
     // Create a viewer
