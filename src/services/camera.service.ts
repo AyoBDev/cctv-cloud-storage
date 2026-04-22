@@ -9,10 +9,20 @@ import { AppError } from '@utils/errors';
 import { env } from '@config/env';
 import { createIoTThing, deleteIoTThing } from '@services/iot.service';
 
+interface PostgresError {
+  code?: string;
+  constraint?: string;
+}
+
+function isPostgresError(err: unknown): err is PostgresError {
+  return typeof err === 'object' && err !== null && 'code' in err;
+}
+
 export interface Camera {
   id: string;
   org_id: string;
   name: string;
+  slug: string;
   location: string | null;
   timezone: string;
   rtsp_url_encrypted: string | null;
@@ -33,6 +43,7 @@ export interface CameraResponse {
   id: string;
   org_id: string;
   name: string;
+  slug: string;
   location: string | null;
   timezone: string;
   kvs_stream_name: string;
@@ -72,6 +83,7 @@ function toCameraResponse(camera: Camera): CameraResponse {
     id: camera.id,
     org_id: camera.org_id,
     name: camera.name,
+    slug: camera.slug,
     location: camera.location,
     timezone: camera.timezone,
     kvs_stream_name: camera.kvs_stream_name,

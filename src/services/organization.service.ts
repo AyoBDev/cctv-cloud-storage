@@ -7,6 +7,7 @@ export interface Organization {
   name: string;
   slug: string;
   is_active: boolean;
+  camera_seq: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -37,7 +38,7 @@ export async function listOrganizations(
   const total = countRow ? parseInt(countRow.count, 10) : 0;
 
   const data = await db<Organization[]>`
-    SELECT id, name, slug, is_active, created_at, updated_at
+    SELECT id, name, slug, is_active, camera_seq, created_at, updated_at
     FROM organizations
     ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
@@ -55,7 +56,7 @@ export async function createOrganizationWithAdmin(
       const orgRows = await (tx as unknown as Sql)<Organization[]>`
         INSERT INTO organizations (name, slug)
         VALUES (${params.name}, ${params.slug})
-        RETURNING id, name, slug, is_active, created_at, updated_at
+        RETURNING id, name, slug, is_active, camera_seq, created_at, updated_at
       `;
 
       const org = orgRows[0];
@@ -85,7 +86,7 @@ export async function createOrganizationWithAdmin(
 
 export async function getOrganizationById(db: Sql, orgId: string): Promise<Organization> {
   const rows = await db<Organization[]>`
-    SELECT id, name, slug, is_active, created_at, updated_at
+    SELECT id, name, slug, is_active, camera_seq, created_at, updated_at
     FROM organizations
     WHERE id = ${orgId}
   `;
@@ -105,7 +106,7 @@ export async function updateOrganization(
       UPDATE organizations
       SET ${db(updates)}
       WHERE id = ${orgId}
-      RETURNING id, name, slug, is_active, created_at, updated_at
+      RETURNING id, name, slug, is_active, camera_seq, created_at, updated_at
     `;
 
     const org = rows[0];
