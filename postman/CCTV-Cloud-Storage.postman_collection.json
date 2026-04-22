@@ -2430,7 +2430,7 @@
                 "cameras"
               ]
             },
-            "description": "Create a new camera and provision a KVS stream.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Camera name (1-255 chars) |\n| `location` | string | No | Physical location |\n| `timezone` | string | No | IANA timezone (default: UTC) |\n| `rtsp_url` | string | No | RTSP stream URL (encrypted at rest via KMS) |"
+            "description": "Create a new camera and provision a KVS stream + IoT Thing.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Camera name (1-255 chars) |\n| `location` | string | No | Physical location |\n| `timezone` | string | No | IANA timezone (default: UTC) |\n| `rtsp_url` | string | No | RTSP stream URL (encrypted at rest via KMS) |\n\n### Response\nCamera status starts as `provisioning`. It transitions to `online` when the device starts streaming (via internal webhook)."
           },
           "event": [
             {
@@ -2447,6 +2447,7 @@
                   "    pm.expect(body).to.have.property('name');",
                   "    pm.expect(body).to.have.property('kvs_stream_name');",
                   "    pm.expect(body).to.have.property('status');",
+                  "    pm.expect(body.status).to.equal('provisioning');",
                   "    pm.expect(body.is_active).to.be.true;",
                   "});",
                   "",
@@ -2606,10 +2607,23 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has all credential fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('device_cert');",
+                  "    pm.expect(body).to.have.property('private_key');",
+                  "    pm.expect(body).to.have.property('root_ca_url');",
+                  "    pm.expect(body).to.have.property('iot_credential_endpoint');",
+                  "    pm.expect(body).to.have.property('kvs_stream_name');",
+                  "    pm.expect(body).to.have.property('role_alias');",
+                  "    pm.expect(body).to.have.property('region');",
+                  "});",
+                  "",
                   "if (pm.response.code === 200) {",
                   "    const body = pm.response.json();",
-                  "    pm.collectionVariables.set(\"iotCredentialEndpoint\", body.iot_credential_endpoint);",
-                  "    pm.collectionVariables.set(\"kvsStreamName\", body.kvs_stream_name);",
+                  "    pm.collectionVariables.set('iotCredentialEndpoint', body.iot_credential_endpoint);",
+                  "    pm.collectionVariables.set('kvsStreamName', body.kvs_stream_name);",
                   "}"
                 ]
               }
@@ -2705,7 +2719,7 @@
                 "{{cameraId}}"
               ]
             },
-            "description": "Deactivate a camera and delete its KVS stream.\n\n**Auth:** `requireOrgAdmin`\n\nSoft-deletes (sets `is_active = false`, `status = inactive`). KVS stream is deleted."
+            "description": "Deactivate a camera and clean up all AWS resources.\n\n**Auth:** `requireOrgAdmin`\n\nPerforms full cleanup: deactivates IoT certificate, detaches policy, deletes certificate, deletes IoT Thing, deletes KVS stream. Soft-deletes in DB (sets `is_active = false`, `status = inactive`)."
           },
           "event": [
             {
