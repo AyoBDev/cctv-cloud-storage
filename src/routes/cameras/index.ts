@@ -24,6 +24,12 @@ const cameraIdParamsSchema = z.object({
 
 const createCameraBodySchema = z.object({
   name: z.string().min(1).max(255),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens')
+    .min(1)
+    .max(100)
+    .optional(),
   location: z.string().max(255).optional(),
   timezone: z.string().max(50).optional(),
   rtsp_url: z.string().url().optional(),
@@ -51,6 +57,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
           required: ['name'],
           properties: {
             name: { type: 'string', minLength: 1, maxLength: 255 },
+            slug: { type: 'string', maxLength: 100 },
             location: { type: 'string', maxLength: 255 },
             timezone: { type: 'string', maxLength: 50 },
             rtsp_url: { type: 'string', format: 'uri' },
@@ -63,6 +70,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
               id: { type: 'string' },
               org_id: { type: 'string' },
               name: { type: 'string' },
+              slug: { type: 'string' },
               location: { type: 'string', nullable: true },
               timezone: { type: 'string' },
               kvs_stream_name: { type: 'string' },
@@ -79,9 +87,10 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
     },
     async (request, reply) => {
       const body = createCameraBodySchema.parse(request.body);
-      const data: { name: string; location?: string; timezone?: string; rtsp_url?: string } = {
+      const data: { name: string; slug?: string; location?: string; timezone?: string; rtsp_url?: string } = {
         name: body.name,
       };
+      if (body.slug !== undefined) data.slug = body.slug;
       if (body.location !== undefined) data.location = body.location;
       if (body.timezone !== undefined) data.timezone = body.timezone;
       if (body.rtsp_url !== undefined) data.rtsp_url = body.rtsp_url;
@@ -160,6 +169,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
               id: { type: 'string' },
               org_id: { type: 'string' },
               name: { type: 'string' },
+              slug: { type: 'string' },
               location: { type: 'string', nullable: true },
               timezone: { type: 'string' },
               rtsp_url: { type: 'string' },
@@ -208,6 +218,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
               id: { type: 'string' },
               org_id: { type: 'string' },
               name: { type: 'string' },
+              slug: { type: 'string' },
               location: { type: 'string', nullable: true },
               timezone: { type: 'string' },
               kvs_stream_name: { type: 'string' },

@@ -23,7 +23,8 @@ const createOrgBodySchema = z.object({
   slug: z
     .string()
     .regex(/^[a-z0-9-]+$/)
-    .max(100),
+    .max(100)
+    .optional(),
   adminEmail: z.string().email(),
   adminPassword: z.string().min(8),
 });
@@ -88,7 +89,7 @@ export default async function organizationRoutes(app: FastifyInstance): Promise<
       schema: {
         body: {
           type: 'object',
-          required: ['name', 'slug', 'adminEmail', 'adminPassword'],
+          required: ['name', 'adminEmail', 'adminPassword'],
           properties: {
             name: { type: 'string', minLength: 1, maxLength: 255 },
             slug: { type: 'string', maxLength: 100 },
@@ -114,7 +115,13 @@ export default async function organizationRoutes(app: FastifyInstance): Promise<
     },
     async (request, reply) => {
       const body = createOrgBodySchema.parse(request.body);
-      const org = await createOrganizationWithAdmin(app.db, body);
+      const slug = body.slug ?? body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const org = await createOrganizationWithAdmin(app.db, {
+        name: body.name,
+        slug,
+        adminEmail: body.adminEmail,
+        adminPassword: body.adminPassword,
+      });
       return reply.code(201).send(org);
     },
   );
