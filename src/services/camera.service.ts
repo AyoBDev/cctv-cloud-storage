@@ -102,25 +102,60 @@ export async function createCamera(
   kms: KMSClient,
   iot: IoTClient,
   orgId: string,
-  data: { name: string; location?: string; timezone?: string; rtsp_url?: string },
+  data: { name: string; slug?: string; location?: string; timezone?: string; rtsp_url?: string },
 ): Promise<CameraResponse> {
-  // Insert with a placeholder stream name first to get the camera ID
-  const rows = await db<Camera[]>`
-    INSERT INTO cameras (org_id, name, location, timezone, kvs_stream_name)
-    VALUES (
-      ${orgId},
-      ${data.name},
-      ${data.location ?? null},
-      ${data.timezone ?? 'UTC'},
-      'pending'
-    )
-    RETURNING *
+  // Look up the org slug
+  const orgRows = await db<[{ slug: string; camera_seq: number }]>`
+    SELECT slug, camera_seq FROM organizations WHERE id = ${orgId}
   `;
+  const org = orgRows[0];
+  if (!org) throw new Error('Organization not found');
+
+  let cameraSlug: string;
+
+  if (data.slug) {
+    // User-provided slug
+    cameraSlug = data.slug;
+  } else {
+    // Auto-generate: increment camera_seq and use cam{n}
+    const seqRows = await db<[{ camera_seq: number }]>`
+      UPDATE organizations
+      SET camera_seq = camera_seq + 1
+      WHERE id = ${orgId}
+      RETURNING camera_seq
+    `;
+    const seq = seqRows[0];
+    if (!seq) throw new Error('Failed to increment camera_seq');
+    cameraSlug = `cam${seq.camera_seq}`;
+  }
+
+  const streamName = `${org.slug}-${cameraSlug}`;
+
+  // Insert camera with slug and stream name
+  let rows: Camera[];
+  try {
+    rows = await db<Camera[]>`
+      INSERT INTO cameras (org_id, name, slug, location, timezone, kvs_stream_name)
+      VALUES (
+        ${orgId},
+        ${data.name},
+        ${cameraSlug},
+        ${data.location ?? null},
+        ${data.timezone ?? 'UTC'},
+        ${streamName}
+      )
+      RETURNING *
+    `;
+  } catch (err) {
+    if (isPostgresError(err) && err.code === '23505') {
+      throw AppError.conflict('Camera slug already taken in this organization');
+    }
+    throw err;
+  }
 
   const camera = rows[0];
   if (!camera) throw new Error('Insert returned no rows');
 
-  const streamName = `${orgId}-${camera.id}`;
   let streamArn: string | null = null;
   let iotThingName: string | null = null;
 
@@ -135,7 +170,6 @@ export async function createCamera(
       );
       streamArn = result.StreamARN ?? null;
     } catch (err) {
-      // Clean up DB row on KVS failure
       await db`DELETE FROM cameras WHERE id = ${camera.id}`;
       throw err;
     }
@@ -147,7 +181,6 @@ export async function createCamera(
       await createIoTThing(iot, streamName, env.IOT_THING_TYPE);
       iotThingName = streamName;
     } catch (err) {
-      // Rollback: delete KVS stream + DB row
       if (streamArn) {
         await kvs.send(new DeleteStreamCommand({ StreamARN: streamArn }));
       }
@@ -164,11 +197,10 @@ export async function createCamera(
     encryptedUrl = await encryptRtspUrl(kms, env.KMS_KEY_ID, data.rtsp_url);
   }
 
-  // Update with real stream name, ARN, IoT Thing name, and encrypted URL
+  // Update with ARN, IoT Thing name, and encrypted URL
   const updated = await db<Camera[]>`
     UPDATE cameras
-    SET kvs_stream_name = ${streamName},
-        kvs_stream_arn = ${streamArn},
+    SET kvs_stream_arn = ${streamArn},
         iot_thing_name = ${iotThingName},
         rtsp_url_encrypted = ${encryptedUrl},
         status = 'provisioning'
