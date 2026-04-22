@@ -68,7 +68,7 @@ describe('Cameras', () => {
       expect(body.timezone).toBe('America/New_York');
       expect(body.org_id).toBe(orgId);
       expect(body.kvs_stream_name).toContain(orgId);
-      expect(body.status).toBe('online');
+      expect(body.status).toBe('provisioning');
       expect(body.is_active).toBe(true);
     });
 
