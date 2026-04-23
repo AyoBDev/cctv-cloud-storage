@@ -57,6 +57,8 @@ tags:
     description: Camera management (org-scoped, Redis-cached)
   - name: Admin Cameras
     description: Super admin camera management (cross-org)
+  - name: Camera Assignments
+    description: Camera-viewer assignment management (org_admin only)
   - name: Internal
     description: Internal webhook endpoints (shared-secret auth)
 
@@ -1285,6 +1287,12 @@ paths:
                   type: string
                   format: uri
                   description: RTSP stream URL (encrypted at rest)
+                viewer_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Optional list of viewer user IDs to assign to this camera
             example:
               name: Front Door Camera
               slug: front-door
@@ -1502,6 +1510,499 @@ paths:
           description: Camera not found
         '409':
           description: Credentials already issued
+
+  # ─────────────────────────────────────────────────────────
+  # Camera Assignments (Org Admin)
+  # ─────────────────────────────────────────────────────────
+  /api/v1/cameras/{cameraId}/viewers:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      summary: Add viewers to camera
+      description: Assigns one or more viewer users to a camera. Org admin only.
+      operationId: addViewersToCamera
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids]
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+            example:
+              user_ids:
+                - "550e8400-e29b-41d4-a716-446655440001"
+                - "550e8400-e29b-41d4-a716-446655440002"
+      responses:
+        "200":
+          description: Viewers assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assigned]
+                properties:
+                  assigned:
+                    type: integer
+              example:
+                assigned: 2
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    get:
+      summary: List viewers for camera
+      description: Returns all viewer users assigned to a camera. Org admin only.
+      operationId: listViewersForCamera
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of assigned viewers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [viewers]
+                properties:
+                  viewers:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, email, assigned_at]
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        email:
+                          type: string
+                          format: email
+                        assigned_at:
+                          type: string
+                          format: date-time
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: Replace all viewers for camera
+      description: Replaces all viewer assignments for a camera. Org admin only.
+      operationId: replaceViewersForCamera
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids]
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+            example:
+              user_ids:
+                - "550e8400-e29b-41d4-a716-446655440003"
+      responses:
+        "200":
+          description: Viewers replaced
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assigned]
+                properties:
+                  assigned:
+                    type: integer
+              example:
+                assigned: 1
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Remove viewers from camera
+      description: Removes one or more viewer assignments from a camera. Org admin only.
+      operationId: removeViewersFromCamera
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids]
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+            example:
+              user_ids:
+                - "550e8400-e29b-41d4-a716-446655440001"
+      responses:
+        "200":
+          description: Viewers removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [removed]
+                properties:
+                  removed:
+                    type: integer
+              example:
+                removed: 1
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/org/users/{userId}/cameras:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      summary: Add cameras to viewer
+      description: Assigns one or more cameras to a viewer user. Org admin only.
+      operationId: addCamerasToViewer
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [camera_ids]
+              properties:
+                camera_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+            example:
+              camera_ids:
+                - "660e8400-e29b-41d4-a716-446655440001"
+                - "660e8400-e29b-41d4-a716-446655440002"
+      responses:
+        "200":
+          description: Cameras assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assigned]
+                properties:
+                  assigned:
+                    type: integer
+              example:
+                assigned: 2
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    get:
+      summary: List cameras for viewer
+      description: Returns all cameras assigned to a viewer user. Org admin only.
+      operationId: listCamerasForViewer
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of assigned cameras
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cameras]
+                properties:
+                  cameras:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, slug, status, assigned_at]
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                        slug:
+                          type: string
+                        status:
+                          type: string
+                          enum: [provisioning, online, offline, inactive]
+                        assigned_at:
+                          type: string
+                          format: date-time
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: Replace all cameras for viewer
+      description: Replaces all camera assignments for a viewer user. Org admin only.
+      operationId: replaceCamerasForViewer
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [camera_ids]
+              properties:
+                camera_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+            example:
+              camera_ids:
+                - "660e8400-e29b-41d4-a716-446655440003"
+      responses:
+        "200":
+          description: Cameras replaced
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assigned]
+                properties:
+                  assigned:
+                    type: integer
+              example:
+                assigned: 1
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Remove cameras from viewer
+      description: Removes one or more camera assignments from a viewer user. Org admin only.
+      operationId: removeCamerasFromViewer
+      tags: [Camera Assignments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [camera_ids]
+              properties:
+                camera_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+            example:
+              camera_ids:
+                - "660e8400-e29b-41d4-a716-446655440001"
+      responses:
+        "200":
+          description: Cameras removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [removed]
+                properties:
+                  removed:
+                    type: integer
+              example:
+                removed: 1
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # ─────────────────────────────────────────────────────────
   # Admin Cameras (Super Admin)

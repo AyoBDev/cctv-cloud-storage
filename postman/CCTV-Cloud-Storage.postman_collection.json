@@ -54,6 +54,12 @@
       "description": "Set after creating a camera. Used by GET/PATCH/DELETE camera requests."
     },
     {
+      "key": "viewerUserId",
+      "value": "",
+      "type": "string",
+      "description": "Viewer user ID for camera assignment endpoints. Set manually or after creating a viewer."
+    },
+    {
       "key": "internalApiSecret",
       "value": "",
       "type": "string",
@@ -2729,6 +2735,492 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Camera Assignments",
+      "description": "Camera-viewer assignment management. Org Admins can assign/unassign viewers to cameras from both camera-centric and user-centric perspectives.",
+      "item": [
+        {
+          "name": "Add Viewers to Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_ids\": [\"{{viewerUserId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}/viewers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}",
+                "viewers"
+              ]
+            },
+            "description": "Assign one or more viewer users to a camera.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `user_ids` | uuid[] | Yes | Array of viewer user IDs to assign |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has assigned count', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('assigned');",
+                  "    pm.expect(body.assigned).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List Viewers for Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}/viewers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}",
+                "viewers"
+              ]
+            },
+            "description": "List all viewer users assigned to a camera.\n\n**Auth:** `requireOrgAdmin`\n\n### Response\n```json\n{\n  \"viewers\": [\n    { \"id\": \"uuid\", \"email\": \"viewer@example.com\", \"assigned_at\": \"2026-04-23T12:00:00Z\" }\n  ]\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has viewers array', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('viewers');",
+                  "    pm.expect(body.viewers).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Replace Viewers for Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_ids\": [\"{{viewerUserId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}/viewers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}",
+                "viewers"
+              ]
+            },
+            "description": "Replace all viewer assignments for a camera. Removes existing assignments and sets the provided list.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `user_ids` | uuid[] | Yes | Array of viewer user IDs (replaces all existing) |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has assigned count', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('assigned');",
+                  "    pm.expect(body.assigned).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Remove Viewers from Camera",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_ids\": [\"{{viewerUserId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cameras/{{cameraId}}/viewers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cameras",
+                "{{cameraId}}",
+                "viewers"
+              ]
+            },
+            "description": "Remove one or more viewer assignments from a camera.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `user_ids` | uuid[] | Yes | Array of viewer user IDs to remove |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has removed count', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('removed');",
+                  "    pm.expect(body.removed).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Add Cameras to Viewer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"camera_ids\": [\"{{cameraId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users/{{viewerUserId}}/cameras",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users",
+                "{{viewerUserId}}",
+                "cameras"
+              ]
+            },
+            "description": "Assign one or more cameras to a viewer user.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `camera_ids` | uuid[] | Yes | Array of camera IDs to assign |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has assigned count', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('assigned');",
+                  "    pm.expect(body.assigned).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List Cameras for Viewer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users/{{viewerUserId}}/cameras",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users",
+                "{{viewerUserId}}",
+                "cameras"
+              ]
+            },
+            "description": "List all cameras assigned to a viewer user.\n\n**Auth:** `requireOrgAdmin`\n\n### Response\n```json\n{\n  \"cameras\": [\n    { \"id\": \"uuid\", \"name\": \"Front Door\", \"slug\": \"front-door\", \"status\": \"online\", \"assigned_at\": \"2026-04-23T12:00:00Z\" }\n  ]\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has cameras array', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('cameras');",
+                  "    pm.expect(body.cameras).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Replace Cameras for Viewer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"camera_ids\": [\"{{cameraId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users/{{viewerUserId}}/cameras",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users",
+                "{{viewerUserId}}",
+                "cameras"
+              ]
+            },
+            "description": "Replace all camera assignments for a viewer user. Removes existing assignments and sets the provided list.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `camera_ids` | uuid[] | Yes | Array of camera IDs (replaces all existing) |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has assigned count', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('assigned');",
+                  "    pm.expect(body.assigned).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Remove Cameras from Viewer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"camera_ids\": [\"{{cameraId}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/users/{{viewerUserId}}/cameras",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "users",
+                "{{viewerUserId}}",
+                "cameras"
+              ]
+            },
+            "description": "Remove one or more camera assignments from a viewer user.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `camera_ids` | uuid[] | Yes | Array of camera IDs to remove |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response has removed count', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('removed');",
+                  "    pm.expect(body.removed).to.be.a('number');",
+                  "});"
                 ]
               }
             }
