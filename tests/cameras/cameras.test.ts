@@ -8,6 +8,7 @@ describe('Cameras', () => {
   let orgId: string;
   let orgAdminAccessToken: string;
   let viewerAccessToken: string;
+  let viewerId: string;
 
   beforeAll(async () => {
     app = await buildTestApp();
@@ -20,12 +21,13 @@ describe('Cameras', () => {
     // Create a viewer user and login
     const viewerEmail = `viewer-cam-${Date.now()}@example.com`;
     const viewerPassword = 'password123!';
-    await app.inject({
+    const viewerRes = await app.inject({
       method: 'POST',
       url: '/api/v1/org/users',
       headers: { authorization: `Bearer ${orgAdminAccessToken}` },
       payload: { email: viewerEmail, password: viewerPassword },
     });
+    viewerId = viewerRes.json<{ id: string }>().id;
 
     const loginRes = await app.inject({
       method: 'POST',
@@ -330,7 +332,15 @@ describe('Cameras', () => {
       expect(body.rtsp_url).toBe('rtsp://192.168.1.200:554/stream');
     });
 
-    it('viewer can get camera (requireUser)', async () => {
+    it('viewer can get camera when assigned', async () => {
+      // Assign camera to viewer first
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/cameras/${cameraId}/viewers`,
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: { user_ids: [viewerId] },
+      });
+
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/cameras/${cameraId}`,
@@ -338,6 +348,24 @@ describe('Cameras', () => {
       });
 
       expect(res.statusCode).toBe(200);
+    });
+
+    it('viewer gets 403 on unassigned camera', async () => {
+      // Remove assignment
+      await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/cameras/${cameraId}/viewers`,
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: { user_ids: [viewerId] },
+      });
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/cameras/${cameraId}`,
+        headers: { authorization: `Bearer ${viewerAccessToken}` },
+      });
+
+      expect(res.statusCode).toBe(403);
     });
 
     it('returns 404 for non-existent camera', async () => {

@@ -5,10 +5,12 @@ import { requireOrgAdmin } from '@middleware/require-org-admin';
 import {
   createCamera,
   listCameras,
+  listCamerasForViewerUser,
   getCameraById,
   updateCamera,
   deactivateCamera,
 } from '@services/camera.service';
+import { isViewerAssigned } from '@services/assignment.service';
 import { issueCredentials, getCredentialEndpoint } from '@services/iot.service';
 import { env } from '@config/env';
 import { AppError } from '@utils/errors';
@@ -148,13 +150,21 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
     },
     async (request, reply) => {
       const query = paginationQuerySchema.parse(request.query);
-      const result = await listCameras(
-        app.db,
-        app.redis,
-        request.user.org_id!,
-        query.page,
-        query.limit,
-      );
+      const orgId = request.user.org_id!;
+
+      if (request.user.role === 'viewer') {
+        const result = await listCamerasForViewerUser(
+          app.db,
+          app.redis,
+          orgId,
+          request.user.sub,
+          query.page,
+          query.limit,
+        );
+        return reply.code(200).send(result);
+      }
+
+      const result = await listCameras(app.db, app.redis, orgId, query.page, query.limit);
       return reply.code(200).send(result);
     },
   );
@@ -195,6 +205,15 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
     async (request, reply) => {
       const params = cameraIdParamsSchema.parse(request.params);
       const camera = await getCameraById(app.db, app.kms, request.user.org_id!, params.cameraId);
+
+      // Viewers can only access assigned cameras
+      if (request.user.role === 'viewer') {
+        const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
+        if (!assigned) {
+          throw AppError.forbidden('Camera not assigned to you');
+        }
+      }
+
       return reply.code(200).send(camera);
     },
   );
@@ -317,7 +336,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
           },
         },
       },
-      preHandler: [requireOrgAdmin],
+      preHandler: [requireUser],
     },
     async (request, reply) => {
       const params = cameraIdParamsSchema.parse(request.params);
@@ -342,6 +361,14 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
       const camera = rows[0];
       if (!camera) throw AppError.notFound('Camera not found');
       if (camera.org_id !== orgId) throw AppError.forbidden('Access denied');
+
+      // Viewers can only access credentials for assigned cameras
+      if (request.user.role === 'viewer') {
+        const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
+        if (!assigned) {
+          throw AppError.forbidden('Camera not assigned to you');
+        }
+      }
       if (camera.credentials_issued) {
         throw AppError.conflict('Credentials already issued. Use rotate endpoint to reissue.');
       }

@@ -256,6 +256,48 @@ export async function listCameras(
   return result;
 }
 
+export async function listCamerasForViewerUser(
+  db: Sql,
+  redis: Redis,
+  orgId: string,
+  userId: string,
+  page: number,
+  limit: number,
+): Promise<PaginatedResult<CameraResponse>> {
+  const key = `cameras:list:${orgId}:${userId}:${page}:${limit}`;
+
+  const cached = await redis.get(key);
+  if (cached) {
+    return JSON.parse(cached) as PaginatedResult<CameraResponse>;
+  }
+
+  const offset = (page - 1) * limit;
+
+  const countRows = await db<[{ count: string }]>`
+    SELECT COUNT(*) FROM cameras c
+    INNER JOIN camera_assignments ca ON ca.camera_id = c.id
+    WHERE c.org_id = ${orgId} AND c.is_active = true AND ca.user_id = ${userId}
+  `;
+  const total = countRows[0] ? parseInt(countRows[0].count, 10) : 0;
+
+  const data = await db<Camera[]>`
+    SELECT c.* FROM cameras c
+    INNER JOIN camera_assignments ca ON ca.camera_id = c.id
+    WHERE c.org_id = ${orgId} AND c.is_active = true AND ca.user_id = ${userId}
+    ORDER BY c.created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const result: PaginatedResult<CameraResponse> = {
+    data: data.map(toCameraResponse),
+    pagination: { page, limit, total },
+  };
+
+  await redis.setex(key, CACHE_TTL, JSON.stringify(result));
+
+  return result;
+}
+
 export async function getCameraById(
   db: Sql,
   kms: KMSClient,
