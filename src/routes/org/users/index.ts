@@ -8,6 +8,7 @@ import {
   updateOrgUser,
   deleteOrgUser,
 } from '@services/org-user.service';
+import userCameraRoutes from './cameras';
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -203,4 +204,7 @@ export default async function orgUserRoutes(app: FastifyInstance): Promise<void>
       return reply.code(204).send();
     },
   );
+
+  // User camera assignment routes: /api/v1/org/users/:userId/cameras/*
+  await app.register(userCameraRoutes, { prefix: '/:userId/cameras' });
 }
