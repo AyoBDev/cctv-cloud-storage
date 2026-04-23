@@ -10,7 +10,7 @@ import {
   updateCamera,
   deactivateCamera,
 } from '@services/camera.service';
-import { isViewerAssigned } from '@services/assignment.service';
+import { isViewerAssigned, addViewersToCamera } from '@services/assignment.service';
 import { issueCredentials, getCredentialEndpoint } from '@services/iot.service';
 import { env } from '@config/env';
 import { AppError } from '@utils/errors';
@@ -36,6 +36,7 @@ const createCameraBodySchema = z.object({
   location: z.string().max(255).optional(),
   timezone: z.string().max(50).optional(),
   rtsp_url: z.string().url().optional(),
+  viewer_ids: z.array(z.string().uuid()).min(1).max(100).optional(),
 });
 
 const updateCameraBodySchema = z
@@ -64,6 +65,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
             location: { type: 'string', maxLength: 255 },
             timezone: { type: 'string', maxLength: 50 },
             rtsp_url: { type: 'string', format: 'uri' },
+            viewer_ids: { type: 'array', items: { type: 'string', format: 'uuid' } },
           },
         },
         response: {
@@ -113,6 +115,18 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
         request.user.org_id!,
         data,
       );
+
+      // Inline viewer assignment
+      if (body.viewer_ids && body.viewer_ids.length > 0) {
+        await addViewersToCamera(
+          app.db,
+          request.user.org_id!,
+          camera.id,
+          body.viewer_ids,
+          request.user.sub,
+        );
+      }
+
       return reply.code(201).send(camera);
     },
   );
