@@ -12,6 +12,7 @@ import {
 import { issueCredentials, getCredentialEndpoint } from '@services/iot.service';
 import { env } from '@config/env';
 import { AppError } from '@utils/errors';
+import cameraViewerRoutes from './viewers';
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -375,4 +376,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
       });
     },
   );
+
+  // Camera viewer assignment routes: /api/v1/cameras/:cameraId/viewers/*
+  await app.register(cameraViewerRoutes, { prefix: '/:cameraId/viewers' });
 }

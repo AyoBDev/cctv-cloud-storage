@@ -70,7 +70,7 @@ function cacheKey(orgId: string, page: number, limit: number): string {
   return `cameras:list:${orgId}:${page}:${limit}`;
 }
 
-async function invalidateOrgCameraCache(redis: Redis, orgId: string): Promise<void> {
+export async function invalidateOrgCameraCache(redis: Redis, orgId: string): Promise<void> {
   const pattern = `${cacheKeyPrefix(orgId)}*`;
   const keys = await redis.keys(pattern);
   if (keys.length > 0) {
