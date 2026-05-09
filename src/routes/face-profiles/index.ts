@@ -29,26 +29,31 @@ export default async function faceProfileRoutes(app: FastifyInstance): Promise<v
 
   // POST /api/v1/face-profiles
   app.post('/', { preHandler: [requireUser] }, async (request, reply) => {
-    const data = await request.file();
-    if (!data) throw AppError.badRequest('Multipart form data required');
+    let label = '';
+    let buffer: Buffer | null = null;
+    let mimetype = '';
 
-    const fields = data.fields;
-    const labelField = fields['label'];
-    if (!labelField || !('value' in labelField) || typeof labelField.value !== 'string') {
+    const parts = request.parts();
+    for await (const part of parts) {
+      if (part.type === 'field' && part.fieldname === 'label') {
+        label = typeof part.value === 'string' ? part.value : '';
+      } else if (part.type === 'file' && part.fieldname === 'image') {
+        mimetype = part.mimetype;
+        buffer = await part.toBuffer();
+      }
+    }
+
+    if (!label || label.length === 0) {
       throw AppError.badRequest('Label is required');
     }
-    const label = labelField.value;
-    if (label.length === 0 || label.length > 255) {
+    if (label.length > 255) {
       throw AppError.badRequest('Label must be between 1 and 255 characters');
     }
-
-    if (!data.mimetype || !ALLOWED_MIME_TYPES.includes(data.mimetype)) {
-      throw AppError.badRequest('Image must be JPEG or PNG');
-    }
-
-    const buffer = await data.toBuffer();
-    if (buffer.length === 0) {
+    if (!buffer || buffer.length === 0) {
       throw AppError.badRequest('Image file is required');
+    }
+    if (!mimetype || !ALLOWED_MIME_TYPES.includes(mimetype)) {
+      throw AppError.badRequest('Image must be JPEG or PNG');
     }
 
     const profile = await createFaceProfile(
@@ -57,8 +62,8 @@ export default async function faceProfileRoutes(app: FastifyInstance): Promise<v
       request.user.org_id!,
       request.user.sub,
       label,
-      buffer,
-      data.mimetype,
+      buffer!,
+      mimetype,
     );
 
     return reply.code(201).send(profile);
