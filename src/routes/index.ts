@@ -6,6 +6,7 @@ import adminCameraRoutes from './admin/cameras/index';
 import authRoutes from './auth/index';
 import orgUserRoutes from './org/users/index';
 import cameraRoutes from './cameras/index';
+import faceProfileRoutes from './face-profiles/index';
 
 export default async function apiRoutes(app: FastifyInstance): Promise<void> {
   // Admin auth routes: /api/v1/admin/auth/*
@@ -28,4 +29,7 @@ export default async function apiRoutes(app: FastifyInstance): Promise<void> {
 
   // Camera routes: /api/v1/cameras/*
   await app.register(cameraRoutes, { prefix: '/cameras' });
+
+  // Face profile routes: /api/v1/face-profiles/*
+  await app.register(faceProfileRoutes, { prefix: '/face-profiles' });
 }
