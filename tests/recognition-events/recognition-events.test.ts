@@ -62,7 +62,10 @@ describe('Recognition Events', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ data: unknown[]; pagination: { cursor: string | null; has_more: boolean } }>();
+      const body = res.json<{
+        data: unknown[];
+        pagination: { cursor: string | null; has_more: boolean };
+      }>();
       expect(body.data.length).toBeGreaterThanOrEqual(1);
       expect(body.pagination).toHaveProperty('has_more');
     });

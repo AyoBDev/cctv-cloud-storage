@@ -23,12 +23,16 @@ async function validateViewerIds(db: Sql, orgId: string, userIds: string[]): Pro
   `;
 
   if (rows.length !== userIds.length) {
-    throw AppError.badRequest('One or more user IDs are invalid or do not belong to this organization');
+    throw AppError.badRequest(
+      'One or more user IDs are invalid or do not belong to this organization',
+    );
   }
 
   const nonViewers = rows.filter((r) => r.role !== 'viewer');
   if (nonViewers.length > 0) {
-    throw AppError.badRequest('Cannot assign cameras to org admins — they already have access to all cameras');
+    throw AppError.badRequest(
+      'Cannot assign cameras to org admins — they already have access to all cameras',
+    );
   }
 }
 
@@ -39,7 +43,9 @@ async function validateCameraIds(db: Sql, orgId: string, cameraIds: string[]): P
   `;
 
   if (rows.length !== cameraIds.length) {
-    throw AppError.badRequest('One or more camera IDs are invalid or do not belong to this organization');
+    throw AppError.badRequest(
+      'One or more camera IDs are invalid or do not belong to this organization',
+    );
   }
 }
 
@@ -76,7 +82,11 @@ export async function addViewersToCamera(
   await verifyCameraOrg(db, orgId, cameraId);
   await validateViewerIds(db, orgId, userIds);
 
-  const values = userIds.map((uid) => ({ camera_id: cameraId, user_id: uid, assigned_by: assignedBy }));
+  const values = userIds.map((uid) => ({
+    camera_id: cameraId,
+    user_id: uid,
+    assigned_by: assignedBy,
+  }));
 
   const rows = await db`
     INSERT INTO camera_assignments ${db(values, 'camera_id', 'user_id', 'assigned_by')}
@@ -119,7 +129,11 @@ export async function replaceViewersForCamera(
 
     if (userIds.length === 0) return 0;
 
-    const values = userIds.map((uid) => ({ camera_id: cameraId, user_id: uid, assigned_by: assignedBy }));
+    const values = userIds.map((uid) => ({
+      camera_id: cameraId,
+      user_id: uid,
+      assigned_by: assignedBy,
+    }));
 
     const rows = await (tx as unknown as Sql)`
       INSERT INTO camera_assignments ${(tx as unknown as Sql)(values, 'camera_id', 'user_id', 'assigned_by')}
@@ -160,7 +174,11 @@ export async function addCamerasToViewer(
   await verifyViewerOrg(db, orgId, userId);
   await validateCameraIds(db, orgId, cameraIds);
 
-  const values = cameraIds.map((cid) => ({ camera_id: cid, user_id: userId, assigned_by: assignedBy }));
+  const values = cameraIds.map((cid) => ({
+    camera_id: cid,
+    user_id: userId,
+    assigned_by: assignedBy,
+  }));
 
   const rows = await db`
     INSERT INTO camera_assignments ${db(values, 'camera_id', 'user_id', 'assigned_by')}
@@ -203,7 +221,11 @@ export async function replaceCamerasForViewer(
 
     if (cameraIds.length === 0) return 0;
 
-    const values = cameraIds.map((cid) => ({ camera_id: cid, user_id: userId, assigned_by: assignedBy }));
+    const values = cameraIds.map((cid) => ({
+      camera_id: cid,
+      user_id: userId,
+      assigned_by: assignedBy,
+    }));
 
     const rows = await (tx as unknown as Sql)`
       INSERT INTO camera_assignments ${(tx as unknown as Sql)(values, 'camera_id', 'user_id', 'assigned_by')}

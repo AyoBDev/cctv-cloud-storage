@@ -106,7 +106,9 @@ describe('Camera Viewer Assignments', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ viewers: Array<{ id: string; email: string; assigned_at: string }> }>();
+      const body = res.json<{
+        viewers: Array<{ id: string; email: string; assigned_at: string }>;
+      }>();
       expect(body.viewers).toHaveLength(1);
       expect(body.viewers[0]!.id).toBe(viewerId);
     });

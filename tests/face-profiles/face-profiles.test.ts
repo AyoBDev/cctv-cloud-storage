@@ -98,7 +98,10 @@ describe('Face Profiles', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ data: unknown[]; pagination: { page: number; limit: number; total: number } }>();
+      const body = res.json<{
+        data: unknown[];
+        pagination: { page: number; limit: number; total: number };
+      }>();
       expect(body.data.length).toBeGreaterThanOrEqual(1);
       expect(body.pagination.page).toBe(1);
     });

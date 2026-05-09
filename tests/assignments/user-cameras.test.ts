@@ -93,7 +93,15 @@ describe('User Camera Assignments', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ cameras: Array<{ id: string; name: string; slug: string; status: string; assigned_at: string }> }>();
+      const body = res.json<{
+        cameras: Array<{
+          id: string;
+          name: string;
+          slug: string;
+          status: string;
+          assigned_at: string;
+        }>;
+      }>();
       expect(body.cameras).toHaveLength(1);
       expect(body.cameras[0]!.id).toBe(cameraId);
     });

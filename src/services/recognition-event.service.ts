@@ -148,12 +148,17 @@ export async function listRecognitionEvents(
   filters: ListEventsFilters,
 ): Promise<CursorPaginatedResult> {
   const cameraFilter = filters.camera_id ? db`AND camera_id = ${filters.camera_id}` : db``;
-  const faceProfileFilter = filters.face_profile_id ? db`AND face_profile_id = ${filters.face_profile_id}` : db``;
-  const eventTypeFilter = (filters.event_type || filters.unknown_only)
-    ? db`AND event_type = ${filters.unknown_only ? 'unknown_face' : filters.event_type!}`
+  const faceProfileFilter = filters.face_profile_id
+    ? db`AND face_profile_id = ${filters.face_profile_id}`
     : db``;
-  const minConfFilter = filters.min_confidence !== undefined ? db`AND confidence >= ${filters.min_confidence}` : db``;
-  const maxConfFilter = filters.max_confidence !== undefined ? db`AND confidence <= ${filters.max_confidence}` : db``;
+  const eventTypeFilter =
+    filters.event_type || filters.unknown_only
+      ? db`AND event_type = ${filters.unknown_only ? 'unknown_face' : filters.event_type!}`
+      : db``;
+  const minConfFilter =
+    filters.min_confidence !== undefined ? db`AND confidence >= ${filters.min_confidence}` : db``;
+  const maxConfFilter =
+    filters.max_confidence !== undefined ? db`AND confidence <= ${filters.max_confidence}` : db``;
   const startDateFilter = filters.start_date ? db`AND created_at >= ${filters.start_date}` : db``;
   const endDateFilter = filters.end_date ? db`AND created_at <= ${filters.end_date}` : db``;
   const cursorFilter = filters.cursor ? db`AND id < ${filters.cursor}` : db``;

@@ -27,6 +27,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['node_modules/', 'dist/', 'coverage/', 'jest.config.ts', 'eslint.config.mjs'],
+    ignores: ['node_modules/', 'dist/', 'coverage/', 'jest.config.ts', 'eslint.config.mjs', 'lambda/'],
   },
 );
