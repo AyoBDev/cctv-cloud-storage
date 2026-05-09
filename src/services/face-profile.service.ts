@@ -65,11 +65,19 @@ export async function createFaceProfile(
   await createCollection(orgId);
   const faceId = await indexFace(orgId, imageBuffer);
 
-  const rows = await db<FaceProfile[]>`
-    INSERT INTO face_profiles (org_id, face_id, label, image_key, created_by)
-    VALUES (${orgId}, ${faceId}, ${label}, 'pending', ${userId})
-    RETURNING *
-  `;
+  let rows: FaceProfile[];
+  try {
+    rows = await db<FaceProfile[]>`
+      INSERT INTO face_profiles (org_id, face_id, label, image_key, created_by)
+      VALUES (${orgId}, ${faceId}, ${label}, 'pending', ${userId})
+      RETURNING *
+    `;
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as { code: string }).code === '23505') {
+      throw AppError.conflict('This face is already indexed');
+    }
+    throw err;
+  }
 
   const profile = rows[0];
   if (!profile) throw new Error('Insert returned no rows');
