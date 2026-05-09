@@ -55,10 +55,16 @@ tags:
     description: Org admin user management (org-scoped)
   - name: Cameras
     description: Camera management (org-scoped, Redis-cached)
+  - name: Streaming
+    description: Live camera streaming (HLS via KVS)
   - name: Admin Cameras
     description: Super admin camera management (cross-org)
   - name: Camera Assignments
     description: Camera-viewer assignment management (org_admin only)
+  - name: Face Profiles
+    description: Face profile management (org-scoped)
+  - name: Recognition Events
+    description: Face recognition event feed (org-scoped)
   - name: Internal
     description: Internal webhook endpoints (shared-secret auth)
 
@@ -250,6 +256,18 @@ components:
               type: string
               description: Decrypted RTSP URL (only on single camera GET)
 
+    HlsStream:
+      type: object
+      required: [hls_url, expires_in]
+      properties:
+        hls_url:
+          type: string
+          description: Signed HLS streaming session URL (playable via hls.js or native Safari)
+        expires_in:
+          type: integer
+          description: URL validity in seconds (900 = 15 minutes)
+          example: 900
+
     HealthCheck:
       type: object
       required: [status, db, redis]
@@ -263,6 +281,84 @@ components:
         redis:
           type: string
           enum: [ok, error]
+
+    FaceProfile:
+      type: object
+      required: [id, org_id, face_id, label, image_url, created_by, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+        face_id:
+          type: string
+          description: AWS Rekognition face ID
+        label:
+          type: string
+          description: Human-readable label for this face profile
+        image_url:
+          type: string
+          description: S3 URL to the uploaded face image
+        created_by:
+          type: string
+          format: uuid
+          description: User ID who uploaded this profile
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RecognitionEvent:
+      type: object
+      required: [id, org_id, camera_id, event_type, confidence, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+        camera_id:
+          type: string
+          format: uuid
+        face_profile_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: "Matched face profile ID (null for unknown_face events)"
+        event_type:
+          type: string
+          enum: [known_face, unknown_face]
+        confidence:
+          type: number
+          description: Recognition confidence score (0-100)
+        thumbnail_url:
+          type: string
+          nullable: true
+          description: S3 URL to event thumbnail image
+        unknown_face_id:
+          type: string
+          nullable: true
+          description: Temporary ID for unknown face clustering
+        created_at:
+          type: string
+          format: date-time
+
+    CursorPagination:
+      type: object
+      required: [cursor, has_more]
+      properties:
+        cursor:
+          type: string
+          nullable: true
+          description: "Cursor for next page (null if has_more is false)"
+        has_more:
+          type: boolean
+          description: Whether there are more results available
 
 paths:
   # ─────────────────────────────────────────────────────────
@@ -1512,6 +1608,71 @@ paths:
           description: Credentials already issued
 
   # ─────────────────────────────────────────────────────────
+  # Streaming
+  # ─────────────────────────────────────────────────────────
+  /api/v1/cameras/{cameraId}/stream:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get live stream URL
+      description: |
+        Generates a signed KVS HLS streaming session URL for live camera viewing.
+        The URL expires after 15 minutes — clients should re-fetch before expiry.
+        Camera must be in `online` status. Viewers can only stream cameras assigned to them.
+      operationId: getCameraStream
+      tags: [Streaming]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: HLS streaming URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HlsStream"
+              example:
+                hls_url: "https://b-1234abcd.kinesisvideo.eu-west-2.amazonaws.com/hls/v1/getHLSMasterPlaylist.m3u8?SessionToken=..."
+                expires_in: 900
+        "400":
+          description: Camera is not online
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: BAD_REQUEST
+                  message: "Camera is not online (current status: provisioning)"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — camera not assigned to viewer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: FORBIDDEN
+                  message: Camera not assigned to you
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
   # Camera Assignments (Org Admin)
   # ─────────────────────────────────────────────────────────
   /api/v1/cameras/{cameraId}/viewers:
@@ -2005,6 +2166,340 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   # ─────────────────────────────────────────────────────────
+  # Face Profiles
+  # ─────────────────────────────────────────────────────────
+  /api/v1/face-profiles:
+    get:
+      summary: List face profiles
+      description: Returns a paginated list of face profiles in the authenticated user's organization.
+      operationId: listFaceProfiles
+      tags: [Face Profiles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated face profiles
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FaceProfile"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: Upload face image
+      description: |
+        Upload a face image to create a new face profile. The image is indexed in AWS Rekognition.
+        Only one face must be detected in the image. Supported formats: JPEG, PNG.
+      operationId: uploadFaceProfile
+      tags: [Face Profiles]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, label]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Face image file (JPEG or PNG)
+                label:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  description: Human-readable label (e.g., person's name)
+      responses:
+        "201":
+          description: Face profile created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceProfile"
+              example:
+                id: "650e8400-e29b-41d4-a716-446655440000"
+                org_id: "550e8400-e29b-41d4-a716-446655440000"
+                face_id: "1a2b3c4d-5e6f-7g8h-9i0j-k1l2m3n4o5p6"
+                label: "John Doe"
+                image_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/faces/650e8400.jpg"
+                created_by: "660e8400-e29b-41d4-a716-446655440000"
+                created_at: "2026-05-09T12:00:00.000Z"
+                updated_at: "2026-05-09T12:00:00.000Z"
+        "400":
+          description: Validation error or no face detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: "No face detected in image"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/face-profiles/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get face profile
+      description: Retrieves a single face profile by UUID. Returns 403 if the profile belongs to a different organization.
+      operationId: getFaceProfile
+      tags: [Face Profiles]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Face profile details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceProfile"
+        "403":
+          description: Access denied — profile belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Face profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Face profile not found
+
+    delete:
+      summary: Delete face profile
+      description: |
+        Deletes a face profile and removes the face from AWS Rekognition collection.
+        Org admin only.
+      operationId: deleteFaceProfile
+      tags: [Face Profiles]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Face profile deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — org admin required or profile belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Face profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Recognition Events
+  # ─────────────────────────────────────────────────────────
+  /api/v1/recognition-events:
+    get:
+      summary: List recognition events
+      description: |
+        Returns a cursor-paginated list of face recognition events with optional filters.
+        Events are org-scoped and ordered by created_at descending.
+      operationId: listRecognitionEvents
+      tags: [Recognition Events]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: camera_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by camera ID
+        - name: face_profile_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by face profile ID
+        - name: event_type
+          in: query
+          schema:
+            type: string
+            enum: [known_face, unknown_face]
+          description: Filter by event type
+        - name: unknown_only
+          in: query
+          schema:
+            type: boolean
+          description: Show only unknown face events
+        - name: min_confidence
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100
+          description: Minimum confidence score
+        - name: max_confidence
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100
+          description: Maximum confidence score
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Start date filter (ISO 8601)
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: End date filter (ISO 8601)
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor from previous response
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Recognition events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RecognitionEvent"
+                  pagination:
+                    $ref: "#/components/schemas/CursorPagination"
+              example:
+                data:
+                  - id: "750e8400-e29b-41d4-a716-446655440000"
+                    org_id: "550e8400-e29b-41d4-a716-446655440000"
+                    camera_id: "660e8400-e29b-41d4-a716-446655440000"
+                    face_profile_id: "650e8400-e29b-41d4-a716-446655440000"
+                    event_type: "known_face"
+                    confidence: 98.5
+                    thumbnail_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/events/750e8400.jpg"
+                    unknown_face_id: null
+                    created_at: "2026-05-09T12:00:00.000Z"
+                pagination:
+                  cursor: "eyJpZCI6IjY1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9"
+                  has_more: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/recognition-events/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get recognition event
+      description: Retrieves a single recognition event by UUID. Returns 403 if the event belongs to a different organization.
+      operationId: getRecognitionEvent
+      tags: [Recognition Events]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recognition event details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecognitionEvent"
+        "403":
+          description: Access denied — event belongs to another org
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Recognition event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Recognition event not found
+
+  # ─────────────────────────────────────────────────────────
   # Admin Cameras (Super Admin)
   # ─────────────────────────────────────────────────────────
   /api/v1/admin/cameras:
@@ -2126,6 +2621,86 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /internal/recognition-events:
+    post:
+      summary: Create recognition event
+      description: |
+        Creates a new face recognition event from the Lambda face recognition pipeline.
+        Authenticated via `x-internal-secret` header (shared secret, NOT JWT).
+        If face_profile_id is null, treats as unknown_face event.
+      operationId: createRecognitionEvent
+      tags: [Internal]
+      security: []
+      parameters:
+        - name: x-internal-secret
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret for internal service auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [org_id, camera_id, image_bytes, confidence, event_type]
+              properties:
+                org_id:
+                  type: string
+                  format: uuid
+                camera_id:
+                  type: string
+                  format: uuid
+                image_bytes:
+                  type: string
+                  format: byte
+                  description: Base64-encoded thumbnail image
+                confidence:
+                  type: number
+                  minimum: 0
+                  maximum: 100
+                face_profile_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: "Matched face profile ID (null for unknown_face)"
+                event_type:
+                  type: string
+                  enum: [known_face, unknown_face]
+            example:
+              org_id: "550e8400-e29b-41d4-a716-446655440000"
+              camera_id: "660e8400-e29b-41d4-a716-446655440000"
+              image_bytes: "/9j/4AAQSkZJRgABAQEAYABgAAD..."
+              confidence: 95.2
+              face_profile_id: "650e8400-e29b-41d4-a716-446655440000"
+              event_type: "known_face"
+      responses:
+        "201":
+          description: Recognition event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecognitionEvent"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or missing internal secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Organization or camera not found
           content:
             application/json:
               schema:
