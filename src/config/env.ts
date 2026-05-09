@@ -33,6 +33,15 @@ const envSchema = z.object({
   IOT_POLICY_NAME: z.string().default(''),
   IOT_ROLE_ALIAS: z.string().default('camera-iot-role-alias'),
   IOT_THING_TYPE: z.string().default('IPCamera'),
+
+  S3_MEDIA_BUCKET: z.string().default(''),
+  SES_FROM_EMAIL: z.string().email().default('noreply@example.com'),
+  SES_REGION: z.string().default('eu-west-2'),
+  REKOGNITION_COLLECTION_PREFIX: z.string().default('collection-'),
+  REKOGNITION_UNKNOWN_PREFIX: z.string().default('unknown-'),
+  REKOGNITION_MATCH_THRESHOLD: z.coerce.number().min(0).max(100).default(80),
+  UNKNOWN_FACE_TTL_HOURS: z.coerce.number().int().positive().default(24),
+  ALERT_DEBOUNCE_SECONDS: z.coerce.number().int().positive().default(300),
 });
 
 function parseEnv() {
