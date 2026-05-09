@@ -44,8 +44,8 @@ jobs:
       DATABASE_URL: postgres://cctv:cctv_test@localhost:5432/cctv_test
       DATABASE_SSL: false
       REDIS_URL: redis://localhost:6379
-      JWT_PRIVATE_KEY: ${{ secrets.CI_JWT_PRIVATE_KEY }}
-      JWT_PUBLIC_KEY: ${{ secrets.CI_JWT_PUBLIC_KEY }}
+      JWT_PRIVATE_KEY: placeholder-overridden-by-step
+      JWT_PUBLIC_KEY: placeholder-overridden-by-step
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       CORS_ORIGIN: http://localhost:3001
@@ -65,6 +65,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Generate RS256 JWT keys for CI
+        run: |
+          openssl genpkey -algorithm RSA -out /tmp/jwt-private.pem -pkeyopt rsa_keygen_bits:2048
+          openssl rsa -in /tmp/jwt-private.pem -pubout -out /tmp/jwt-public.pem
+          echo "JWT_PRIVATE_KEY=$(cat /tmp/jwt-private.pem | tr '\n' '§' | sed 's/§/\\n/g')" >> $GITHUB_ENV
+          echo "JWT_PUBLIC_KEY=$(cat /tmp/jwt-public.pem | tr '\n' '§' | sed 's/§/\\n/g')" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: npm ci
