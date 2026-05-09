@@ -7,6 +7,7 @@ import authRoutes from './auth/index';
 import orgUserRoutes from './org/users/index';
 import cameraRoutes from './cameras/index';
 import faceProfileRoutes from './face-profiles/index';
+import recognitionEventRoutes from './recognition-events/index';
 
 export default async function apiRoutes(app: FastifyInstance): Promise<void> {
   // Admin auth routes: /api/v1/admin/auth/*
@@ -32,4 +33,7 @@ export default async function apiRoutes(app: FastifyInstance): Promise<void> {
 
   // Face profile routes: /api/v1/face-profiles/*
   await app.register(faceProfileRoutes, { prefix: '/face-profiles' });
+
+  // Recognition event routes: /api/v1/recognition-events/*
+  await app.register(recognitionEventRoutes, { prefix: '/recognition-events' });
 }
