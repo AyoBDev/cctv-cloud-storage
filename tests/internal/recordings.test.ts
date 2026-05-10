@@ -126,7 +126,9 @@ describe('Internal Recordings', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ cameras: Array<{ id: string; org_id: string; kvs_stream_name: string }> }>();
+      const body = res.json<{
+        cameras: Array<{ id: string; org_id: string; kvs_stream_name: string }>;
+      }>();
       expect(Array.isArray(body.cameras)).toBe(true);
     });
 

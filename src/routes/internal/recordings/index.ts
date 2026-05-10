@@ -15,23 +15,15 @@ const createRecordingBodySchema = z.object({
 
 export default async function internalRecordingRoutes(app: FastifyInstance): Promise<void> {
   // POST /internal/recordings
-  app.post(
-    '/recordings',
-    { preHandler: [requireInternalSecret] },
-    async (request, reply) => {
-      const body = createRecordingBodySchema.parse(request.body);
-      const recording = await createRecording(app.db, body);
-      return reply.code(201).send(recording);
-    },
-  );
+  app.post('/recordings', { preHandler: [requireInternalSecret] }, async (request, reply) => {
+    const body = createRecordingBodySchema.parse(request.body);
+    const recording = await createRecording(app.db, body);
+    return reply.code(201).send(recording);
+  });
 
   // GET /internal/cameras/active
-  app.get(
-    '/cameras/active',
-    { preHandler: [requireInternalSecret] },
-    async (_request, reply) => {
-      const cameras = await getActiveCameras(app.db);
-      return reply.code(200).send({ cameras });
-    },
-  );
+  app.get('/cameras/active', { preHandler: [requireInternalSecret] }, async (_request, reply) => {
+    const cameras = await getActiveCameras(app.db);
+    return reply.code(200).send({ cameras });
+  });
 }

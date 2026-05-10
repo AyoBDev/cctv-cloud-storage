@@ -63,7 +63,10 @@ describe('Recordings', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ data: unknown[]; pagination: { cursor: string | null; has_more: boolean } }>();
+      const body = res.json<{
+        data: unknown[];
+        pagination: { cursor: string | null; has_more: boolean };
+      }>();
       expect(body.data.length).toBe(3);
       expect(body.pagination.has_more).toBe(false);
     });
@@ -76,7 +79,10 @@ describe('Recordings', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ data: unknown[]; pagination: { cursor: string | null; has_more: boolean } }>();
+      const body = res.json<{
+        data: unknown[];
+        pagination: { cursor: string | null; has_more: boolean };
+      }>();
       expect(body.data.length).toBe(2);
       expect(body.pagination.has_more).toBe(true);
       expect(body.pagination.cursor).not.toBeNull();
