@@ -19,6 +19,7 @@ import healthRoute from '@routes/health';
 import apiRoutes from '@routes/index';
 import internalCameraRoutes from '@routes/internal/cameras/index';
 import internalRecognitionEventRoutes from '@routes/internal/recognition-events/index';
+import internalRecordingRoutes from '@routes/internal/recordings/index';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -56,6 +57,7 @@ export function buildApp(): FastifyInstance {
   void app.register(apiRoutes, { prefix: '/api/v1' });
   void app.register(internalCameraRoutes, { prefix: '/internal/cameras' });
   void app.register(internalRecognitionEventRoutes, { prefix: '/internal' });
+  void app.register(internalRecordingRoutes, { prefix: '/internal' });
 
   // Global error handler — { error: { code, message } } shape
   app.setErrorHandler<FastifyError>((err, _request, reply) => {
