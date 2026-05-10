@@ -65,6 +65,8 @@ tags:
     description: Face profile management (org-scoped)
   - name: Recognition Events
     description: Face recognition event feed (org-scoped)
+  - name: Recordings
+    description: Camera recordings management (org-scoped)
   - name: Internal
     description: Internal webhook endpoints (shared-secret auth)
 
@@ -359,6 +361,58 @@ components:
         has_more:
           type: boolean
           description: Whether there are more results available
+
+    RecordingListItem:
+      type: object
+      required: [id, camera_id, start_time, end_time, duration_seconds, file_size_bytes, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        camera_id:
+          type: string
+          format: uuid
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          minimum: 0
+        file_size_bytes:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+
+    RecordingDetail:
+      allOf:
+        - $ref: "#/components/schemas/RecordingListItem"
+        - type: object
+          required: [playback_url]
+          properties:
+            playback_url:
+              type: string
+              description: Pre-signed S3 URL for video playback (1-hour TTL)
+
+    ActiveCamera:
+      type: object
+      required: [id, org_id, kvs_stream_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+        kvs_stream_name:
+          type: string
+        kvs_stream_arn:
+          type: string
+          nullable: true
 
 paths:
   # ─────────────────────────────────────────────────────────
@@ -2166,6 +2220,166 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   # ─────────────────────────────────────────────────────────
+  # Recordings (Org-scoped)
+  # ─────────────────────────────────────────────────────────
+  /api/v1/cameras/{cameraId}/recordings:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: List recordings for camera
+      description: |
+        Returns a cursor-paginated list of recordings for a specific camera within a date range.
+        Recordings are ordered by start_time descending.
+      operationId: listRecordings
+      tags: [Recordings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: Start date for recordings query (ISO 8601)
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: End date for recordings query (ISO 8601)
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Pagination cursor (recording ID) from previous response
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Recordings list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RecordingListItem"
+                  pagination:
+                    $ref: "#/components/schemas/CursorPagination"
+              example:
+                data:
+                  - id: "850e8400-e29b-41d4-a716-446655440000"
+                    camera_id: "660e8400-e29b-41d4-a716-446655440000"
+                    start_time: "2026-05-10T10:00:00.000Z"
+                    end_time: "2026-05-10T11:00:00.000Z"
+                    duration_seconds: 3600
+                    file_size_bytes: 524288000
+                    created_at: "2026-05-10T11:00:05.000Z"
+                pagination:
+                  cursor: "850e8400-e29b-41d4-a716-446655440000"
+                  has_more: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — camera not assigned to viewer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/cameras/{cameraId}/recordings/{recordingId}:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: recordingId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get recording detail with playback URL
+      description: |
+        Retrieves a single recording by UUID with a pre-signed S3 playback URL (1-hour TTL).
+        Returns 403 if the camera is not assigned to the viewer.
+      operationId: getRecording
+      tags: [Recordings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recording details with playback URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingDetail"
+              example:
+                id: "850e8400-e29b-41d4-a716-446655440000"
+                camera_id: "660e8400-e29b-41d4-a716-446655440000"
+                start_time: "2026-05-10T10:00:00.000Z"
+                end_time: "2026-05-10T11:00:00.000Z"
+                duration_seconds: 3600
+                file_size_bytes: 524288000
+                created_at: "2026-05-10T11:00:05.000Z"
+                playback_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/recording-850e8400.mp4?X-Amz-..."
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden — camera not assigned to viewer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
   # Face Profiles
   # ─────────────────────────────────────────────────────────
   /api/v1/face-profiles:
@@ -2621,6 +2835,141 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /internal/recordings:
+    post:
+      summary: Create recording metadata
+      description: |
+        Creates a new recording metadata entry from the Lambda video processing pipeline.
+        Authenticated via `x-internal-secret` header (shared secret, NOT JWT).
+        Called after KVS video segments are saved to S3.
+      operationId: createRecording
+      tags: [Internal]
+      security: []
+      parameters:
+        - name: x-internal-secret
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret for internal service auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [org_id, camera_id, s3_key, start_time, end_time, duration_seconds, file_size_bytes]
+              properties:
+                org_id:
+                  type: string
+                  format: uuid
+                camera_id:
+                  type: string
+                  format: uuid
+                s3_key:
+                  type: string
+                  description: S3 object key for the recording file
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+                duration_seconds:
+                  type: integer
+                  minimum: 0
+                file_size_bytes:
+                  type: integer
+                  minimum: 0
+            example:
+              org_id: "550e8400-e29b-41d4-a716-446655440000"
+              camera_id: "660e8400-e29b-41d4-a716-446655440000"
+              s3_key: "orgs/550e8400-e29b-41d4-a716-446655440000/cameras/660e8400-e29b-41d4-a716-446655440000/2026-05-10/recording-850e8400.mp4"
+              start_time: "2026-05-10T10:00:00.000Z"
+              end_time: "2026-05-10T11:00:00.000Z"
+              duration_seconds: 3600
+              file_size_bytes: 524288000
+      responses:
+        "201":
+          description: Recording created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingListItem"
+              example:
+                id: "850e8400-e29b-41d4-a716-446655440000"
+                camera_id: "660e8400-e29b-41d4-a716-446655440000"
+                start_time: "2026-05-10T10:00:00.000Z"
+                end_time: "2026-05-10T11:00:00.000Z"
+                duration_seconds: 3600
+                file_size_bytes: 524288000
+                created_at: "2026-05-10T11:00:05.000Z"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or missing internal secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Organization or camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /internal/cameras/active:
+    get:
+      summary: List active cameras
+      description: |
+        Returns a list of all active cameras with their KVS stream details.
+        Authenticated via `x-internal-secret` header (shared secret, NOT JWT).
+        Used by Lambda to discover which cameras need video processing.
+      operationId: listActiveCameras
+      tags: [Internal]
+      security: []
+      parameters:
+        - name: x-internal-secret
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret for internal service auth
+      responses:
+        "200":
+          description: List of active cameras
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cameras]
+                properties:
+                  cameras:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ActiveCamera"
+              example:
+                cameras:
+                  - id: "660e8400-e29b-41d4-a716-446655440000"
+                    org_id: "550e8400-e29b-41d4-a716-446655440000"
+                    kvs_stream_name: "acme-front-door"
+                    kvs_stream_arn: "arn:aws:kinesisvideo:eu-west-2:774305598371:stream/acme-front-door/1234567890123"
+                  - id: "660e8400-e29b-41d4-a716-446655440001"
+                    org_id: "550e8400-e29b-41d4-a716-446655440000"
+                    kvs_stream_name: "acme-back-door"
+                    kvs_stream_arn: null
+        "401":
+          description: Invalid or missing internal secret
           content:
             application/json:
               schema:
