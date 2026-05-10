@@ -3,7 +3,15 @@ import type { Redis } from 'ioredis';
 import type { KinesisVideoClient } from '@aws-sdk/client-kinesis-video';
 import type { KMSClient } from '@aws-sdk/client-kms';
 import type { IoTClient } from '@aws-sdk/client-iot';
-import { CreateStreamCommand, DeleteStreamCommand } from '@aws-sdk/client-kinesis-video';
+import {
+  CreateStreamCommand,
+  DeleteStreamCommand,
+  GetDataEndpointCommand,
+} from '@aws-sdk/client-kinesis-video';
+import {
+  KinesisVideoArchivedMediaClient,
+  GetHLSStreamingSessionURLCommand,
+} from '@aws-sdk/client-kinesis-video-archived-media';
 import { encryptRtspUrl, decryptRtspUrl } from '@utils/kms';
 import { AppError } from '@utils/errors';
 import { env } from '@config/env';
@@ -165,7 +173,7 @@ export async function createCamera(
       const result = await kvs.send(
         new CreateStreamCommand({
           StreamName: streamName,
-          DataRetentionInHours: 24,
+          DataRetentionInHours: 48,
         }),
       );
       streamArn = result.StreamARN ?? null;
@@ -482,5 +490,84 @@ export async function listAllCameras(
   return {
     data: data.map(toCameraResponse),
     pagination: { page, limit, total },
+  };
+}
+
+const HLS_EXPIRES_SECONDS = 900; // 15 minutes
+
+export interface HlsStreamResponse {
+  hls_url: string;
+  expires_in: number;
+}
+
+export async function getHlsStreamUrl(
+  db: Sql,
+  kvs: KinesisVideoClient,
+  orgId: string,
+  cameraId: string,
+): Promise<HlsStreamResponse> {
+  // Verify camera exists and belongs to org
+  const rows = await db<Camera[]>`
+    SELECT * FROM cameras
+    WHERE id = ${cameraId} AND org_id = ${orgId} AND is_active = true
+  `;
+
+  const camera = rows[0];
+  if (!camera) throw AppError.notFound('Camera not found');
+
+  if (camera.status !== 'online') {
+    throw AppError.badRequest(`Camera is not online (current status: ${camera.status})`);
+  }
+
+  // In test env, return a mock URL
+  if (isTestEnv()) {
+    return {
+      hls_url: `https://mock-kvs.amazonaws.com/hls/${camera.kvs_stream_name}/master.m3u8`,
+      expires_in: HLS_EXPIRES_SECONDS,
+    };
+  }
+
+  // Step 1: Get the HLS data endpoint for this stream
+  const endpointResponse = await kvs.send(
+    new GetDataEndpointCommand({
+      StreamName: camera.kvs_stream_name,
+      APIName: 'GET_HLS_STREAMING_SESSION_URL',
+    }),
+  );
+
+  if (!endpointResponse.DataEndpoint) {
+    throw AppError.badRequest('Failed to get KVS data endpoint');
+  }
+
+  // Step 2: Create an archived media client pointed at the data endpoint
+  const archivedMediaClient = new KinesisVideoArchivedMediaClient({
+    region: env.AWS_REGION,
+    endpoint: endpointResponse.DataEndpoint,
+  });
+
+  // Step 3: Get the HLS streaming session URL
+  const hlsResponse = await archivedMediaClient.send(
+    new GetHLSStreamingSessionURLCommand({
+      StreamName: camera.kvs_stream_name,
+      PlaybackMode: 'LIVE',
+      HLSFragmentSelector: {
+        FragmentSelectorType: 'SERVER_TIMESTAMP',
+      },
+      ContainerFormat: 'FRAGMENTED_MP4',
+      DiscontinuityMode: 'ALWAYS',
+      DisplayFragmentTimestamp: 'ALWAYS',
+      Expires: HLS_EXPIRES_SECONDS,
+    }),
+  );
+
+  archivedMediaClient.destroy();
+
+  if (!hlsResponse.HLSStreamingSessionURL) {
+    throw AppError.badRequest('Failed to generate HLS streaming URL');
+  }
+
+  return {
+    hls_url: hlsResponse.HLSStreamingSessionURL,
+    expires_in: HLS_EXPIRES_SECONDS,
   };
 }
