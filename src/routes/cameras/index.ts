@@ -9,6 +9,7 @@ import {
   getCameraById,
   updateCamera,
   deactivateCamera,
+  getHlsStreamUrl,
 } from '@services/camera.service';
 import { isViewerAssigned, addViewersToCamera } from '@services/assignment.service';
 import { issueCredentials, getCredentialEndpoint } from '@services/iot.service';
@@ -416,6 +417,45 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
         role_alias: env.IOT_ROLE_ALIAS,
         region: env.AWS_REGION,
       });
+    },
+  );
+
+  // GET /api/v1/cameras/:cameraId/stream
+  app.get(
+    '/:cameraId/stream',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['cameraId'],
+          properties: { cameraId: { type: 'string', format: 'uuid' } },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              hls_url: { type: 'string' },
+              expires_in: { type: 'integer' },
+            },
+          },
+        },
+      },
+      preHandler: [requireUser],
+    },
+    async (request, reply) => {
+      const params = cameraIdParamsSchema.parse(request.params);
+      const orgId = request.user.org_id!;
+
+      // Viewers can only stream assigned cameras
+      if (request.user.role === 'viewer') {
+        const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
+        if (!assigned) {
+          throw AppError.forbidden('Camera not assigned to you');
+        }
+      }
+
+      const result = await getHlsStreamUrl(app.db, app.kvs, orgId, params.cameraId);
+      return reply.code(200).send(result);
     },
   );
 
