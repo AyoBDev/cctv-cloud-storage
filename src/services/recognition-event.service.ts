@@ -191,6 +191,42 @@ export async function listRecognitionEvents(
   };
 }
 
+export interface RecordEventInput {
+  org_id: string;
+  camera_id: string;
+  confidence: number;
+  face_profile_id: string | null;
+  event_type: 'known_face' | 'unknown_face';
+  thumbnail_key: string;
+}
+
+export async function recordRecognitionEvent(
+  db: Sql,
+  redis: Redis,
+  input: RecordEventInput,
+): Promise<RecognitionEventResponse> {
+  const rows = await db<RecognitionEvent[]>`
+    INSERT INTO recognition_events (org_id, camera_id, face_profile_id, event_type, confidence, thumbnail_key)
+    VALUES (
+      ${input.org_id},
+      ${input.camera_id},
+      ${input.face_profile_id},
+      ${input.event_type},
+      ${input.confidence},
+      ${input.thumbnail_key}
+    )
+    RETURNING *
+  `;
+
+  const event = rows[0]!;
+
+  // Invalidate cache
+  const keys = await redis.keys(`recognition-events:${input.org_id}:*`);
+  if (keys.length > 0) await redis.del(...keys);
+
+  return toResponse(event);
+}
+
 export async function getRecognitionEventById(
   db: Sql,
   orgId: string,

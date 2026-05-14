@@ -198,12 +198,13 @@ resource "aws_iam_role_policy" "lambda_app" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # KVS — read fragments
+      # KVS — read fragments + get clips
       {
         Effect = "Allow"
         Action = [
           "kinesisvideo:GetDataEndpoint",
           "kinesisvideo:GetMedia",
+          "kinesisvideo:GetClip",
           "kinesisvideo:ListFragments",
           "kinesisvideo:GetMediaForFragmentList"
         ]
@@ -215,12 +216,13 @@ resource "aws_iam_role_policy" "lambda_app" {
         Action   = ["rekognition:SearchFacesByImage"]
         Resource = "*"
       },
-      # S3 — write recognition thumbnails
+      # S3 — write recognition thumbnails + recording clips
       {
         Effect = "Allow"
         Action = ["s3:PutObject"]
         Resource = [
-          "arn:aws:s3:::${var.media_bucket_name}/recognition-events/*"
+          "arn:aws:s3:::${var.media_bucket_name}/recognition-events/*",
+          "arn:aws:s3:::${var.media_bucket_name}/orgs/*"
         ]
       },
       # SSM — read internal API secret
