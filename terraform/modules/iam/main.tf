@@ -210,19 +210,24 @@ resource "aws_iam_role_policy" "lambda_app" {
         ]
         Resource = "*"
       },
-      # Rekognition — search faces
-      {
-        Effect   = "Allow"
-        Action   = ["rekognition:SearchFacesByImage"]
-        Resource = "*"
-      },
-      # S3 — write recognition thumbnails + recording clips
+      # Rekognition — face search (sync + async)
       {
         Effect = "Allow"
-        Action = ["s3:PutObject"]
+        Action = [
+          "rekognition:SearchFacesByImage",
+          "rekognition:StartFaceSearch",
+          "rekognition:GetFaceSearch"
+        ]
+        Resource = "*"
+      },
+      # S3 — write/read recognition thumbnails, recording clips, face search clips
+      {
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:GetObject"]
         Resource = [
           "arn:aws:s3:::${var.media_bucket_name}/recognition-events/*",
-          "arn:aws:s3:::${var.media_bucket_name}/orgs/*"
+          "arn:aws:s3:::${var.media_bucket_name}/orgs/*",
+          "arn:aws:s3:::${var.media_bucket_name}/face-search-clips/*"
         ]
       },
       # SSM — read internal API secret
