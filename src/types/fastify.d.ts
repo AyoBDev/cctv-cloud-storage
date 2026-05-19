@@ -7,6 +7,7 @@ import type { IoTClient } from '@aws-sdk/client-iot';
 import type { RekognitionClient } from '@aws-sdk/client-rekognition';
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { SESClient } from '@aws-sdk/client-ses';
+import type { SNSClient } from '@aws-sdk/client-sns';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -18,5 +19,6 @@ declare module 'fastify' {
     rekognition: RekognitionClient;
     s3: S3Client;
     ses: SESClient;
+    sns: SNSClient;
   }
 }

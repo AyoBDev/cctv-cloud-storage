@@ -6,6 +6,7 @@ import { IoTClient } from '@aws-sdk/client-iot';
 import { RekognitionClient } from '@aws-sdk/client-rekognition';
 import { S3Client } from '@aws-sdk/client-s3';
 import { SESClient } from '@aws-sdk/client-ses';
+import { SNSClient } from '@aws-sdk/client-sns';
 import { env } from '@config/env';
 import { setRekognitionClient } from '@services/rekognition.service';
 import { setS3Client } from '@services/s3.service';
@@ -18,6 +19,7 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   const rekognition = new RekognitionClient({ region: env.AWS_REGION });
   const s3 = new S3Client({ region: env.AWS_REGION });
   const ses = new SESClient({ region: env.SES_REGION });
+  const sns = new SNSClient({ region: env.AWS_REGION });
 
   // Set clients on service modules
   setRekognitionClient(rekognition);
@@ -30,6 +32,7 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   app.decorate('rekognition', rekognition);
   app.decorate('s3', s3);
   app.decorate('ses', ses);
+  app.decorate('sns', sns);
 
   app.addHook('onClose', async () => {
     kvs.destroy();
@@ -38,5 +41,6 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
     rekognition.destroy();
     s3.destroy();
     ses.destroy();
+    sns.destroy();
   });
 });

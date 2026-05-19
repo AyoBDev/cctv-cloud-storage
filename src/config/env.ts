@@ -42,6 +42,12 @@ const envSchema = z.object({
   REKOGNITION_MATCH_THRESHOLD: z.coerce.number().min(0).max(100).default(80),
   UNKNOWN_FACE_TTL_HOURS: z.coerce.number().int().positive().default(24),
   ALERT_DEBOUNCE_SECONDS: z.coerce.number().int().positive().default(300),
+
+  SNS_PLATFORM_ARN_IOS: z.string().default(''),
+  SNS_PLATFORM_ARN_ANDROID: z.string().default(''),
+  WEB_PUSH_VAPID_PUBLIC_KEY: z.string().default(''),
+  WEB_PUSH_VAPID_PRIVATE_KEY: z.string().default(''),
+  WEB_PUSH_CONTACT_EMAIL: z.string().default(''),
 });
 
 function parseEnv() {
