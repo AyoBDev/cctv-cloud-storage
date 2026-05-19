@@ -290,4 +290,31 @@ describe('Chat Messages', () => {
       expect(body.success).toBe(true);
     });
   });
+
+  describe('POST /api/v1/chat/groups/:groupId/media/upload', () => {
+    it('returns a pre-signed upload URL', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/chat/groups/${groupId}/media/upload`,
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: { fileName: 'photo.jpg', contentType: 'image/jpeg' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{ uploadUrl: string; key: string }>();
+      expect(body.key).toContain('chat/');
+      expect(body.uploadUrl).toBeTruthy();
+    });
+
+    it('rejects disallowed content types', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/chat/groups/${groupId}/media/upload`,
+        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+        payload: { fileName: 'script.exe', contentType: 'application/x-msdownload' },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+  });
 });

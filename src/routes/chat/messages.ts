@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { requireUser } from '@middleware/require-user';
 import { AppError } from '@utils/errors';
 import { getGroupById, isMember, isMuted, getMemberRole } from '@services/chat.service';
@@ -199,5 +200,61 @@ export default async function chatMessageRoutes(app: FastifyInstance): Promise<v
 
     await markRead(app.db, params.groupId, request.user.sub, body.lastReadMessageId);
     return reply.code(200).send({ success: true });
+  });
+
+  // --- Media Upload ---
+
+  const ALLOWED_MEDIA_TYPES = new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm',
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ]);
+
+  const mediaUploadSchema = z.object({
+    fileName: z.string().min(1).max(255),
+    contentType: z.string().min(1).max(100),
+  });
+
+  // POST /:groupId/media/upload — Get pre-signed S3 upload URL
+  app.post('/:groupId/media/upload', async (request, reply) => {
+    const params = groupIdParamsSchema.parse(request.params);
+
+    const group = await getGroupById(app.db, params.groupId, request.user.org_id!);
+    if (!group) throw AppError.notFound('Group not found');
+
+    const memberCheck = await isMember(app.db, params.groupId, request.user.sub);
+    if (!memberCheck) throw AppError.forbidden('Not a member of this group');
+
+    const muted = await isMuted(app.db, params.groupId, request.user.sub);
+    if (muted) throw AppError.forbidden('You are muted in this group');
+
+    const body = mediaUploadSchema.parse(request.body);
+    if (!ALLOWED_MEDIA_TYPES.has(body.contentType)) {
+      throw AppError.badRequest('File type not allowed');
+    }
+
+    const { env } = await import('@config/env');
+
+    const now = new Date();
+    const key = `orgs/${request.user.org_id}/chat/${params.groupId}/${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}/${randomUUID()}/${body.fileName}`;
+
+    // In test env, skip actual S3 pre-signed URL generation
+    if (env.NODE_ENV === 'test') {
+      return reply.send({ uploadUrl: `https://s3.mock.amazonaws.com/${key}`, key });
+    }
+
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+    const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+
+    const command = new PutObjectCommand({
+      Bucket: env.S3_MEDIA_BUCKET,
+      Key: key,
+      ContentType: body.contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(app.s3, command, { expiresIn: 300 });
+    return reply.send({ uploadUrl, key });
   });
 }
