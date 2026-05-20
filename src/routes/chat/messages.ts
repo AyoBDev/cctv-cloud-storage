@@ -244,8 +244,8 @@ export default async function chatMessageRoutes(app: FastifyInstance): Promise<v
     const now = new Date();
     const key = `orgs/${request.user.org_id}/chat/${params.groupId}/${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}/${randomUUID()}/${body.fileName}`;
 
-    // In test env, skip actual S3 pre-signed URL generation
-    if (env.NODE_ENV === 'test') {
+    // In test env or when bucket is not configured, return a mock URL
+    if (env.NODE_ENV === 'test' || !env.S3_MEDIA_BUCKET) {
       return reply.send({ uploadUrl: `https://s3.mock.amazonaws.com/${key}`, key });
     }
 
