@@ -54,11 +54,13 @@ export async function sendPushNotification(
         APNS: JSON.stringify({ aps: { alert: { title, body } } }),
       });
 
-      await sns.send(new PublishCommand({
-        TargetArn: token.token,
-        Message: message,
-        MessageStructure: 'json',
-      }));
+      await sns.send(
+        new PublishCommand({
+          TargetArn: token.token,
+          Message: message,
+          MessageStructure: 'json',
+        }),
+      );
     }
   }
 }
@@ -78,25 +80,32 @@ export async function scheduleEmailDigest(
     clearTimeout(pendingDigests.get(digestKey)!);
   }
 
-  const timer = setTimeout(async () => {
-    pendingDigests.delete(digestKey);
+  const timer = setTimeout(
+    async () => {
+      pendingDigests.delete(digestKey);
 
-    const [user] = await db<Array<{ email: string }>>`
+      const [user] = await db<Array<{ email: string }>>`
       SELECT email FROM users WHERE id = ${userId}
     `;
-    if (!user) return;
+      if (!user) return;
 
-    await ses.send(new SendEmailCommand({
-      Source: env.SES_FROM_EMAIL,
-      Destination: { ToAddresses: [user.email] },
-      Message: {
-        Subject: { Data: `New messages in ${groupName}` },
-        Body: {
-          Text: { Data: `You have unread messages in "${groupName}":\n\n${messagePreview}\n\nOpen the app to view all messages.` },
-        },
-      },
-    }));
-  }, 5 * 60 * 1000); // 5 minutes
+      await ses.send(
+        new SendEmailCommand({
+          Source: env.SES_FROM_EMAIL,
+          Destination: { ToAddresses: [user.email] },
+          Message: {
+            Subject: { Data: `New messages in ${groupName}` },
+            Body: {
+              Text: {
+                Data: `You have unread messages in "${groupName}":\n\n${messagePreview}\n\nOpen the app to view all messages.`,
+              },
+            },
+          },
+        }),
+      );
+    },
+    5 * 60 * 1000,
+  ); // 5 minutes
 
   pendingDigests.set(digestKey, timer);
 }

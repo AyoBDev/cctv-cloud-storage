@@ -127,7 +127,10 @@ describe('Chat Messages', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body = res.json<{ data: Array<{ id: string; content: string }>; cursor: string | null }>();
+      const body = res.json<{
+        data: Array<{ id: string; content: string }>;
+        cursor: string | null;
+      }>();
       expect(body.data.length).toBe(2);
       expect(body.cursor).not.toBeNull();
 

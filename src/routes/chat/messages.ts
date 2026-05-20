@@ -205,8 +205,12 @@ export default async function chatMessageRoutes(app: FastifyInstance): Promise<v
   // --- Media Upload ---
 
   const ALLOWED_MEDIA_TYPES = new Set([
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-    'video/mp4', 'video/webm',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'video/mp4',
+    'video/webm',
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

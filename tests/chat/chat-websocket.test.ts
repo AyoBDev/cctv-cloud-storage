@@ -137,9 +137,7 @@ describe('Chat WebSocket', () => {
     });
 
     it('rejects connection with an invalid token', async () => {
-      const ws = new WebSocket(
-        `ws://127.0.0.1:${port}/api/v1/chat/ws?token=invalid-token`,
-      );
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/api/v1/chat/ws?token=invalid-token`);
       trackSocket(ws);
 
       await new Promise<void>((resolve) => {
@@ -238,7 +236,9 @@ describe('Chat WebSocket', () => {
 
       // ws2 should NOT receive anything (we wait briefly and check)
       const received = await Promise.race([
-        waitForEvent(ws2, 'message:new', 500).then(() => true).catch(() => false),
+        waitForEvent(ws2, 'message:new', 500)
+          .then(() => true)
+          .catch(() => false),
         delay(600).then(() => false),
       ]);
       expect(received).toBe(false);
@@ -372,7 +372,7 @@ describe('Chat WebSocket', () => {
       expect(deletedReceiver.messageId).toBe(messageId);
     });
 
-    it('prevents editing another user\'s message', async () => {
+    it("prevents editing another user's message", async () => {
       const ws1 = trackSocket(await connectWs(port, orgAdminAccessToken));
       const ws2 = trackSocket(await connectWs(port, viewerAccessToken));
 

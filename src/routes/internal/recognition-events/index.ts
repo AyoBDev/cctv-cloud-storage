@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireInternalSecret } from '@middleware/require-internal-secret';
-import { createRecognitionEvent, recordRecognitionEvent } from '@services/recognition-event.service';
+import {
+  createRecognitionEvent,
+  recordRecognitionEvent,
+} from '@services/recognition-event.service';
 
 const createEventBodySchema = z.object({
   org_id: z.string().uuid(),
@@ -35,7 +38,12 @@ export default async function internalRecognitionEventRoutes(app: FastifyInstanc
 
       // Legacy path: image_bytes provided, do full Rekognition search
       if (!body.image_bytes) {
-        return reply.code(400).send({ error: { code: 'VALIDATION_ERROR', message: 'Either image_bytes or thumbnail_key is required' } });
+        return reply.code(400).send({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Either image_bytes or thumbnail_key is required',
+          },
+        });
       }
 
       const event = await createRecognitionEvent(app.db, app.redis, {

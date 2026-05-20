@@ -61,9 +61,7 @@ const incomingEventSchema = z.discriminatedUnion('event', [
   }),
   z.object({
     event: z.literal('sync'),
-    groups: z.array(
-      z.object({ groupId: z.string().uuid(), lastMessageId: z.string().uuid() }),
-    ),
+    groups: z.array(z.object({ groupId: z.string().uuid(), lastMessageId: z.string().uuid() })),
   }),
 ]);
 
@@ -199,11 +197,7 @@ async function handleMessage(
   }
 }
 
-async function handleJoin(
-  db: Sql,
-  client: ConnectedClient,
-  groupId: string,
-): Promise<void> {
+async function handleJoin(db: Sql, client: ConnectedClient, groupId: string): Promise<void> {
   const member = await isMember(db, groupId, client.userId);
   if (!member) {
     sendError(client.ws, 'FORBIDDEN', 'Not a member of this group');
@@ -221,7 +215,8 @@ async function handleJoin(
       // Skip echoing back to sender
       if (payload._senderId === client.userId) return;
       // Strip internal field before forwarding
-      const { _senderId: _, ...clean } = payload;
+      const clean = { ...payload };
+      delete clean._senderId;
       sendEvent(client.ws, clean);
     } catch {
       // ignore malformed messages
@@ -248,7 +243,13 @@ async function handleLeave(client: ConnectedClient, groupId: string): Promise<vo
 async function handleSendMessage(
   db: Sql,
   client: ConnectedClient,
-  event: { groupId: string; content: string; type: 'text' | 'media'; mediaUrl?: string | undefined; mediaType?: string | undefined },
+  event: {
+    groupId: string;
+    content: string;
+    type: 'text' | 'media';
+    mediaUrl?: string | undefined;
+    mediaType?: string | undefined;
+  },
 ): Promise<void> {
   if (!client.joinedGroups.has(event.groupId)) {
     sendError(client.ws, 'NOT_JOINED', 'Must join group before sending messages');
@@ -300,7 +301,7 @@ async function handleEditMessage(
     return;
   }
   if (existing.sender_id !== client.userId) {
-    sendError(client.ws, 'FORBIDDEN', 'Cannot edit another user\'s message');
+    sendError(client.ws, 'FORBIDDEN', "Cannot edit another user's message");
     return;
   }
 
@@ -332,7 +333,7 @@ async function handleDeleteMessage(
     return;
   }
   if (existing.sender_id !== client.userId) {
-    sendError(client.ws, 'FORBIDDEN', 'Cannot delete another user\'s message');
+    sendError(client.ws, 'FORBIDDEN', "Cannot delete another user's message");
     return;
   }
 

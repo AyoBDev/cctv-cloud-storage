@@ -5,7 +5,6 @@ import type { FastifyInstance } from 'fastify';
 describe('Chat Moderation', () => {
   let app: FastifyInstance;
   let superAdminToken: string;
-  let orgId: string;
   let orgAdminAccessToken: string;
   let viewerAccessToken: string;
   let viewerId: string;
@@ -16,7 +15,6 @@ describe('Chat Moderation', () => {
     superAdminToken = await loginAsSuperAdmin(app);
 
     const org = await createOrgAndLogin(app, superAdminToken, 'moderation');
-    orgId = org.orgId;
     orgAdminAccessToken = org.orgAdminAccessToken;
 
     // Create a viewer user and login
