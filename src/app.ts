@@ -13,6 +13,7 @@ import rateLimitPlugin from '@plugins/rate-limit';
 import postgresPlugin from '@plugins/postgres';
 import jwtPlugin from '@plugins/jwt';
 import awsPlugin from '@plugins/aws';
+import websocketPlugin from '@plugins/websocket';
 
 // Routes
 import healthRoute from '@routes/health';
@@ -51,6 +52,7 @@ export function buildApp(): FastifyInstance {
   void app.register(postgresPlugin);
   void app.register(jwtPlugin);
   void app.register(awsPlugin);
+  void app.register(websocketPlugin);
 
   // Routes
   void app.register(healthRoute);

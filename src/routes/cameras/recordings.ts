@@ -2,7 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireUser } from '@middleware/require-user';
 import { isViewerAssigned } from '@services/assignment.service';
-import { listRecordings, getRecordingById } from '@services/recording.service';
+import {
+  listRecordings,
+  getRecordingById,
+  getRecordingDownload,
+} from '@services/recording.service';
 import { AppError } from '@utils/errors';
 
 const cameraIdParamsSchema = z.object({
@@ -54,7 +58,6 @@ export default async function cameraRecordingRoutes(app: FastifyInstance): Promi
     const params = recordingIdParamsSchema.parse(request.params);
     const orgId = request.user.org_id!;
 
-    // Viewers can only access assigned cameras
     if (request.user.role === 'viewer') {
       const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
       if (!assigned) {
@@ -64,5 +67,21 @@ export default async function cameraRecordingRoutes(app: FastifyInstance): Promi
 
     const recording = await getRecordingById(app.db, orgId, params.cameraId, params.recordingId);
     return reply.code(200).send(recording);
+  });
+
+  // GET /api/v1/cameras/:cameraId/recordings/:recordingId/download
+  app.get('/:recordingId/download', { preHandler: [requireUser] }, async (request, reply) => {
+    const params = recordingIdParamsSchema.parse(request.params);
+    const orgId = request.user.org_id!;
+
+    if (request.user.role === 'viewer') {
+      const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
+      if (!assigned) {
+        throw AppError.forbidden('Camera not assigned to you');
+      }
+    }
+
+    const download = await getRecordingDownload(app.db, orgId, params.cameraId, params.recordingId);
+    return reply.code(200).send(download);
   });
 }
