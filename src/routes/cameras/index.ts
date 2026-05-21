@@ -17,6 +17,7 @@ import { env } from '@config/env';
 import { AppError } from '@utils/errors';
 import cameraViewerRoutes from './viewers';
 import cameraRecordingRoutes from './recordings';
+import cameraSettingsRoutes from './settings';
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -459,9 +460,162 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
     },
   );
 
+  // GET /api/v1/cameras/:cameraId/config — Device configuration (non-sensitive)
+  app.get('/:cameraId/config', { preHandler: [requireUser] }, async (request, reply) => {
+    const params = cameraIdParamsSchema.parse(request.params);
+    const orgId = request.user.org_id!;
+
+    if (request.user.role === 'viewer') {
+      const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
+      if (!assigned) throw AppError.forbidden('Camera not assigned to you');
+    }
+
+    const rows = await app.db<
+      Array<{
+        id: string;
+        org_id: string;
+        name: string;
+        slug: string;
+        kvs_stream_name: string;
+        kvs_stream_arn: string | null;
+        iot_thing_name: string | null;
+        status: string;
+        timezone: string;
+        credentials_issued: boolean;
+        credentials_issued_at: Date | null;
+        face_detection_enabled: boolean;
+        face_detection_start_time: string | null;
+        face_detection_end_time: string | null;
+        alert_cooldown_minutes: number;
+      }>
+    >`
+        SELECT id, org_id, name, slug, kvs_stream_name, kvs_stream_arn,
+               iot_thing_name, status, timezone, credentials_issued, credentials_issued_at,
+               face_detection_enabled, face_detection_start_time, face_detection_end_time,
+               alert_cooldown_minutes
+        FROM cameras
+        WHERE id = ${params.cameraId} AND org_id = ${orgId} AND is_active = true
+      `;
+
+    const camera = rows[0];
+    if (!camera) throw AppError.notFound('Camera not found');
+
+    return reply.code(200).send({
+      id: camera.id,
+      name: camera.name,
+      slug: camera.slug,
+      kvs_stream_name: camera.kvs_stream_name,
+      kvs_stream_arn: camera.kvs_stream_arn,
+      iot_thing_name: camera.iot_thing_name,
+      status: camera.status,
+      timezone: camera.timezone,
+      region: env.AWS_REGION,
+      iot_credential_endpoint: env.IOT_ROLE_ALIAS
+        ? `https://data-ats.iot.${env.AWS_REGION}.amazonaws.com`
+        : null,
+      role_alias: env.IOT_ROLE_ALIAS || null,
+      credentials_issued: camera.credentials_issued,
+      credentials_issued_at: camera.credentials_issued_at,
+      face_detection: {
+        enabled: camera.face_detection_enabled,
+        start_time: camera.face_detection_start_time,
+        end_time: camera.face_detection_end_time,
+        alert_cooldown_minutes: camera.alert_cooldown_minutes,
+      },
+    });
+  });
+
+  // GET /api/v1/cameras/:cameraId/credentials/download — Download cert as file
+  app.get(
+    '/:cameraId/credentials/download',
+    { preHandler: [requireUser] },
+    async (request, reply) => {
+      const params = cameraIdParamsSchema.parse(request.params);
+      const orgId = request.user.org_id!;
+
+      const rows = await app.db<
+        Array<{
+          id: string;
+          org_id: string;
+          iot_thing_name: string | null;
+          kvs_stream_name: string;
+          credentials_issued: boolean;
+          is_active: boolean;
+        }>
+      >`
+        SELECT id, org_id, iot_thing_name, kvs_stream_name, credentials_issued, is_active
+        FROM cameras
+        WHERE id = ${params.cameraId} AND is_active = true
+      `;
+
+      const camera = rows[0];
+      if (!camera) throw AppError.notFound('Camera not found');
+      if (camera.org_id !== orgId) throw AppError.forbidden('Access denied');
+
+      if (request.user.role === 'viewer') {
+        const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
+        if (!assigned) throw AppError.forbidden('Camera not assigned to you');
+      }
+
+      if (camera.credentials_issued) {
+        throw AppError.conflict('Credentials already issued. Use rotate endpoint to reissue.');
+      }
+      if (!camera.iot_thing_name) {
+        throw AppError.badRequest('Camera has no IoT Thing provisioned');
+      }
+
+      const creds = await issueCredentials(app.iot, camera.iot_thing_name, env.IOT_POLICY_NAME);
+      const endpoint = await getCredentialEndpoint(app.iot);
+
+      await app.db`
+        UPDATE cameras
+        SET iot_certificate_id = ${creds.certificateId},
+            iot_certificate_arn = ${creds.certificateArn},
+            credentials_issued = true,
+            credentials_issued_at = now()
+        WHERE id = ${params.cameraId}
+      `;
+
+      const configContent = [
+        `[device]`,
+        `thing_name = ${camera.iot_thing_name}`,
+        `kvs_stream_name = ${camera.kvs_stream_name}`,
+        `region = ${env.AWS_REGION}`,
+        `credential_endpoint = ${endpoint}`,
+        `role_alias = ${env.IOT_ROLE_ALIAS}`,
+        ``,
+        `[certificates]`,
+        `root_ca_url = https://www.amazontrust.com/repository/AmazonRootCA1.pem`,
+        ``,
+      ].join('\n');
+
+      const certBundle = [
+        `===== DEVICE CERTIFICATE =====`,
+        creds.certificatePem,
+        ``,
+        `===== PRIVATE KEY =====`,
+        creds.privateKey,
+        ``,
+        `===== CONFIGURATION =====`,
+        configContent,
+      ].join('\n');
+
+      return reply
+        .header('Content-Type', 'application/x-pem-file')
+        .header(
+          'Content-Disposition',
+          `attachment; filename="${camera.iot_thing_name}-credentials.pem"`,
+        )
+        .send(certBundle);
+    },
+  );
+
   // Camera viewer assignment routes: /api/v1/cameras/:cameraId/viewers/*
   await app.register(cameraViewerRoutes, { prefix: '/:cameraId/viewers' });
 
   // Camera recording routes: /api/v1/cameras/:cameraId/recordings/*
   await app.register(cameraRecordingRoutes, { prefix: '/:cameraId/recordings' });
+
+  // Camera settings routes: /api/v1/cameras/:cameraId/settings/*
+  await app.register(cameraSettingsRoutes, { prefix: '/:cameraId/settings' });
 }

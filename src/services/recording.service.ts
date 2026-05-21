@@ -21,6 +21,7 @@ export interface RecordingListItem {
   end_time: Date;
   duration_seconds: number;
   file_size_bytes: number;
+  playback_url: string;
   created_at: Date;
 }
 
@@ -31,6 +32,13 @@ export interface RecordingDetail extends RecordingListItem {
 export interface CursorPaginatedRecordings {
   data: RecordingListItem[];
   pagination: { cursor: string | null; has_more: boolean };
+}
+
+export interface RecordingDownload {
+  download_url: string;
+  file_name: string;
+  file_size_bytes: number;
+  content_type: string;
 }
 
 export interface CreateRecordingInput {
@@ -50,7 +58,8 @@ export interface ActiveCamera {
   kvs_stream_arn: string | null;
 }
 
-function toListItem(row: Recording): RecordingListItem {
+async function toListItem(row: Recording): Promise<RecordingListItem> {
+  const playbackUrl = await getSignedUrl(row.s3_key, 3600);
   return {
     id: row.id,
     camera_id: row.camera_id,
@@ -58,6 +67,7 @@ function toListItem(row: Recording): RecordingListItem {
     end_time: row.end_time,
     duration_seconds: row.duration_seconds,
     file_size_bytes: Number(row.file_size_bytes),
+    playback_url: playbackUrl,
     created_at: row.created_at,
   };
 }
@@ -83,7 +93,6 @@ export async function createRecording(
 
   const recording = rows[0];
   if (!recording) {
-    // Duplicate — return existing
     const existing = await db<Recording[]>`
       SELECT * FROM recordings WHERE camera_id = ${input.camera_id} AND start_time = ${input.start_time}
     `;
@@ -91,6 +100,31 @@ export async function createRecording(
   }
 
   return toListItem(recording);
+}
+
+export async function getRecordingDownload(
+  db: Sql,
+  orgId: string,
+  cameraId: string,
+  recordingId: string,
+): Promise<RecordingDownload> {
+  const rows = await db<Recording[]>`
+    SELECT * FROM recordings
+    WHERE id = ${recordingId} AND org_id = ${orgId} AND camera_id = ${cameraId}
+  `;
+
+  const recording = rows[0];
+  if (!recording) throw AppError.notFound('Recording not found');
+
+  const downloadUrl = await getSignedUrl(recording.s3_key, 3600);
+  const fileName = recording.s3_key.split('/').pop() ?? `recording-${recordingId}.mp4`;
+
+  return {
+    download_url: downloadUrl,
+    file_name: fileName,
+    file_size_bytes: Number(recording.file_size_bytes),
+    content_type: 'video/mp4',
+  };
 }
 
 export async function listRecordings(
@@ -119,7 +153,7 @@ export async function listRecordings(
 
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
-  const data = items.map(toListItem);
+  const data = await Promise.all(items.map(toListItem));
   const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]!.id : null;
 
   return {
@@ -142,11 +176,10 @@ export async function getRecordingById(
   const recording = rows[0];
   if (!recording) throw AppError.notFound('Recording not found');
 
-  const playbackUrl = await getSignedUrl(recording.s3_key, 3600);
-
+  const item = await toListItem(recording);
   return {
-    ...toListItem(recording),
-    playback_url: playbackUrl,
+    ...item,
+    playback_url: item.playback_url,
   };
 }
 
