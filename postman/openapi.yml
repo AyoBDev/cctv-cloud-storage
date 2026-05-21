@@ -67,6 +67,14 @@ tags:
     description: Face recognition event feed (org-scoped)
   - name: Recordings
     description: Camera recordings management (org-scoped)
+  - name: Chat Groups
+    description: Chat group management (org-scoped)
+  - name: Chat Messages
+    description: Chat messaging, reactions, and read receipts
+  - name: Chat Moderation
+    description: Chat moderation — reports and muting
+  - name: Camera Settings
+    description: Per-camera face detection and alert configuration
   - name: Internal
     description: Internal webhook endpoints (shared-secret auth)
 
@@ -364,7 +372,7 @@ components:
 
     RecordingListItem:
       type: object
-      required: [id, camera_id, start_time, end_time, duration_seconds, file_size_bytes, created_at]
+      required: [id, camera_id, start_time, end_time, duration_seconds, file_size_bytes, playback_url, created_at]
       properties:
         id:
           type: string
@@ -384,6 +392,9 @@ components:
         file_size_bytes:
           type: integer
           minimum: 0
+        playback_url:
+          type: string
+          description: Pre-signed S3 URL for video playback (1-hour TTL)
         created_at:
           type: string
           format: date-time
@@ -397,6 +408,176 @@ components:
             playback_url:
               type: string
               description: Pre-signed S3 URL for video playback (1-hour TTL)
+
+    RecordingDownload:
+      type: object
+      required: [download_url, file_name, file_size_bytes, content_type]
+      properties:
+        download_url:
+          type: string
+          description: Pre-signed S3 URL for downloading the recording file (1-hour TTL)
+        file_name:
+          type: string
+        file_size_bytes:
+          type: integer
+          minimum: 0
+        content_type:
+          type: string
+          example: video/mp4
+
+    CameraConfig:
+      type: object
+      required: [id, name, slug, kvs_stream_name, status, timezone, region, credentials_issued, face_detection]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        kvs_stream_name:
+          type: string
+        kvs_stream_arn:
+          type: string
+          nullable: true
+        iot_thing_name:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [provisioning, online, offline, inactive]
+        timezone:
+          type: string
+        region:
+          type: string
+        iot_credential_endpoint:
+          type: string
+          nullable: true
+        role_alias:
+          type: string
+          nullable: true
+        credentials_issued:
+          type: boolean
+        credentials_issued_at:
+          type: string
+          format: date-time
+          nullable: true
+        face_detection:
+          $ref: "#/components/schemas/FaceDetectionSettings"
+
+    FaceDetectionSettings:
+      type: object
+      required: [enabled, start_time, end_time, alert_cooldown_minutes]
+      properties:
+        enabled:
+          type: boolean
+          description: Whether face detection is active for this camera
+        start_time:
+          type: string
+          nullable: true
+          description: "Daily start time for face detection (HH:MM:SS format, null = always on)"
+          example: "08:00:00"
+        end_time:
+          type: string
+          nullable: true
+          description: "Daily end time for face detection (HH:MM:SS format, null = always on)"
+          example: "18:00:00"
+        alert_cooldown_minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: Minimum minutes between alerts for this camera
+
+    ChatGroup:
+      type: object
+      required: [id, org_id, name, created_by, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        org_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ChatMessage:
+      type: object
+      required: [id, group_id, sender_id, type, content, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        group_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [text, media, system]
+        content:
+          type: string
+        media_url:
+          type: string
+          nullable: true
+        media_type:
+          type: string
+          nullable: true
+        edited_at:
+          type: string
+          format: date-time
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ChatReport:
+      type: object
+      required: [id, group_id, reported_by, reported_user, reason, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        group_id:
+          type: string
+          format: uuid
+        reported_by:
+          type: string
+          format: uuid
+        reported_user:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+          nullable: true
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [pending, reviewed, dismissed]
+        created_at:
+          type: string
+          format: date-time
 
     ActiveCamera:
       type: object
@@ -2291,6 +2472,7 @@ paths:
                     end_time: "2026-05-10T11:00:00.000Z"
                     duration_seconds: 3600
                     file_size_bytes: 524288000
+                    playback_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/recording.mp4?X-Amz-..."
                     created_at: "2026-05-10T11:00:05.000Z"
                 pagination:
                   cursor: "850e8400-e29b-41d4-a716-446655440000"
@@ -2767,6 +2949,1006 @@ paths:
                 $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden — super admin required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Camera Config & Settings
+  # ─────────────────────────────────────────────────────────
+  /api/v1/cameras/{cameraId}/config:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get camera device configuration
+      description: |
+        Returns the full device configuration for a camera including stream info,
+        IoT settings, credential status, and face detection settings.
+        Viewers can only access cameras assigned to them.
+      operationId: getCameraConfig
+      tags: [Camera Settings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Camera configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CameraConfig"
+        "403":
+          description: Camera not assigned to viewer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/cameras/{cameraId}/settings:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get camera face detection settings
+      description: Returns face detection and alert settings for a camera.
+      operationId: getCameraSettings
+      tags: [Camera Settings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Camera settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceDetectionSettings"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: Update camera face detection settings
+      description: |
+        Update face detection toggle, schedule, and alert cooldown.
+        Org admin only. Set start_time/end_time to null to disable schedule (always-on).
+      operationId: updateCameraSettings
+      tags: [Camera Settings]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                face_detection_enabled:
+                  type: boolean
+                face_detection_start_time:
+                  type: string
+                  nullable: true
+                  description: "Start time in HH:MM format (null to clear)"
+                  example: "08:00"
+                face_detection_end_time:
+                  type: string
+                  nullable: true
+                  description: "End time in HH:MM format (null to clear)"
+                  example: "18:00"
+                alert_cooldown_minutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
+                  description: Minutes between alerts per camera
+            example:
+              face_detection_enabled: true
+              face_detection_start_time: "08:00"
+              face_detection_end_time: "18:00"
+              alert_cooldown_minutes: 30
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceDetectionSettings"
+        "403":
+          description: Not an org admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/cameras/{cameraId}/credentials/download:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Download camera credentials as file
+      description: |
+        Issues IoT credentials and returns them as a downloadable PEM file bundle containing
+        the device certificate, private key, and device configuration.
+        Can only be called once per camera (use rotate endpoint to reissue).
+      operationId: downloadCameraCredentials
+      tags: [Camera Settings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Credential bundle file
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: "attachment; filename=\"{thing_name}-credentials.pem\""
+        "400":
+          description: Camera has no IoT Thing provisioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Credentials already issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/cameras/{cameraId}/recordings/{recordingId}/download:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: recordingId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get recording download URL
+      description: Returns a pre-signed download URL with file metadata for a specific recording.
+      operationId: downloadRecording
+      tags: [Recordings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Download information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingDownload"
+              example:
+                download_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/clip-001.mp4?X-Amz-..."
+                file_name: "clip-001.mp4"
+                file_size_bytes: 524288000
+                content_type: "video/mp4"
+        "403":
+          description: Camera not assigned to viewer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Chat Groups
+  # ─────────────────────────────────────────────────────────
+  /api/v1/chat/groups:
+    get:
+      summary: List chat groups
+      description: Returns all groups the authenticated user belongs to.
+      operationId: listChatGroups
+      tags: [Chat Groups]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatGroup"
+    post:
+      summary: Create chat group
+      description: Creates a new chat group. The creator becomes the owner.
+      operationId: createChatGroup
+      tags: [Chat Groups]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 500
+            example:
+              name: "Security Team"
+              description: "Discussion for security operations"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatGroup"
+
+  /api/v1/chat/groups/{groupId}:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get chat group details
+      description: Returns group details with member list. Must be a member.
+      operationId: getChatGroup
+      tags: [Chat Groups]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Group details with members
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ChatGroup"
+                  - type: object
+                    properties:
+                      members:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            user_id:
+                              type: string
+                              format: uuid
+                            role:
+                              type: string
+                              enum: [owner, member]
+                            email:
+                              type: string
+        "403":
+          description: Not a member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: Update chat group
+      description: Update group name or description. Owner or org_admin only.
+      operationId: updateChatGroup
+      tags: [Chat Groups]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Updated group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatGroup"
+        "403":
+          description: Not owner or org_admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Delete chat group
+      description: Permanently deletes a group. Owner or org_admin only.
+      operationId: deleteChatGroup
+      tags: [Chat Groups]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Group deleted
+        "403":
+          description: Not owner or org_admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/groups/{groupId}/members:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Add members to group
+      description: Add one or more users to the group. Must be a member to invite.
+      operationId: addChatGroupMembers
+      tags: [Chat Groups]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userIds]
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                  maxItems: 50
+      responses:
+        "200":
+          description: Members added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added:
+                    type: integer
+        "403":
+          description: Not a member of this group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/groups/{groupId}/members/{userId}:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      summary: Remove member from group
+      description: |
+        Remove a user from the group. Owner/org_admin can remove others.
+        Any member can remove themselves (self-leave).
+      operationId: removeChatGroupMember
+      tags: [Chat Groups]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Member removed
+        "403":
+          description: Not authorized to remove this member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/groups/{groupId}/members/{userId}/mute:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      summary: Mute a member
+      description: Mute a member for a specified duration (minutes). Owner or org_admin only.
+      operationId: muteChatMember
+      tags: [Chat Moderation]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [duration]
+              properties:
+                duration:
+                  type: integer
+                  minimum: 1
+                  maximum: 525600
+                  description: Mute duration in minutes
+      responses:
+        "200":
+          description: Member muted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  muted_until:
+                    type: string
+                    format: date-time
+        "403":
+          description: Not owner or org_admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/groups/{groupId}/members/{userId}/unmute:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      summary: Unmute a member
+      description: Remove mute from a member. Owner or org_admin only.
+      operationId: unmuteChatMember
+      tags: [Chat Moderation]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Member unmuted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  muted_until:
+                    type: string
+                    nullable: true
+        "403":
+          description: Not owner or org_admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Chat Messages
+  # ─────────────────────────────────────────────────────────
+  /api/v1/chat/groups/{groupId}/messages:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get message history
+      description: Returns cursor-paginated message history for a group. Must be a member.
+      operationId: getChatMessages
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Message ID cursor for pagination
+      responses:
+        "200":
+          description: Message list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMessage"
+                  pagination:
+                    $ref: "#/components/schemas/CursorPagination"
+        "403":
+          description: Not a member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Send message
+      description: Send a text or media message to the group. Must be a member and not muted.
+      operationId: sendChatMessage
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+                type:
+                  type: string
+                  enum: [text, media]
+                  default: text
+                mediaUrl:
+                  type: string
+                  format: uri
+                mediaType:
+                  type: string
+                  maxLength: 50
+            example:
+              content: "Hello team!"
+              type: "text"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "403":
+          description: Not a member or muted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/groups/{groupId}/messages/{messageId}:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      summary: Edit message
+      description: Edit a message. Only the sender can edit their own messages.
+      operationId: editChatMessage
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+      responses:
+        "200":
+          description: Message edited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "403":
+          description: Not the sender
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Delete message
+      description: Soft-deletes a message. Sender, group owner, or org_admin can delete.
+      operationId: deleteChatMessage
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Message deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        "403":
+          description: No permission to delete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/groups/{groupId}/messages/{messageId}/reactions:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Add reaction to message
+      description: Add an emoji reaction to a message. Must be a group member.
+      operationId: addChatReaction
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emoji]
+              properties:
+                emoji:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+            example:
+              emoji: "thumbsup"
+      responses:
+        "201":
+          description: Reaction added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added:
+                    type: boolean
+        "403":
+          description: Not a member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/groups/{groupId}/messages/{messageId}/reactions/{emoji}:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: emoji
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      summary: Remove own reaction
+      description: Remove your own emoji reaction from a message.
+      operationId: removeChatReaction
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Reaction removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removed:
+                    type: boolean
+
+  /api/v1/chat/groups/{groupId}/read:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Mark messages as read
+      description: Update read receipt for the group. Must be a member.
+      operationId: markChatRead
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lastReadMessageId]
+              properties:
+                lastReadMessageId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Read receipt updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /api/v1/chat/groups/{groupId}/media/upload:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Get media upload URL
+      description: |
+        Returns a pre-signed S3 upload URL for media attachments.
+        Must be a group member and not muted.
+        Allowed types: image/jpeg, image/png, image/gif, image/webp, video/mp4, video/webm, application/pdf, docx, xlsx.
+      operationId: getChatMediaUploadUrl
+      tags: [Chat Messages]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileName, contentType]
+              properties:
+                fileName:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                contentType:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+            example:
+              fileName: "screenshot.png"
+              contentType: "image/png"
+      responses:
+        "200":
+          description: Upload URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadUrl:
+                    type: string
+                    description: Pre-signed S3 upload URL (5-min TTL)
+                  key:
+                    type: string
+                    description: S3 key to reference in message mediaUrl
+        "400":
+          description: File type not allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
+  # Chat Moderation — Reports
+  # ─────────────────────────────────────────────────────────
+  /api/v1/chat/groups/{groupId}/reports:
+    parameters:
+      - name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Submit a report
+      description: Report a user for inappropriate behavior in a group. Must be a group member.
+      operationId: submitChatReport
+      tags: [Chat Moderation]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reportedUser, reason]
+              properties:
+                reportedUser:
+                  type: string
+                  format: uuid
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                messageId:
+                  type: string
+                  format: uuid
+                  description: Optional message ID for context
+      responses:
+        "201":
+          description: Report submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatReport"
+
+  /api/v1/chat/reports:
+    get:
+      summary: List reports (org admin)
+      description: Returns all chat reports for the org. Org admin only.
+      operationId: listChatReports
+      tags: [Chat Moderation]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Reports list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatReport"
+        "403":
+          description: Not an org admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/chat/reports/{reportId}:
+    parameters:
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      summary: Update report status
+      description: Change report status to reviewed or dismissed. Org admin only.
+      operationId: updateChatReport
+      tags: [Chat Moderation]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [reviewed, dismissed]
+      responses:
+        "200":
+          description: Report updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatReport"
+        "403":
+          description: Not an org admin
           content:
             application/json:
               schema:
