@@ -5,6 +5,7 @@ import userRoutes from './admin/users/index';
 import adminCameraRoutes from './admin/cameras/index';
 import authRoutes from './auth/index';
 import orgUserRoutes from './org/users/index';
+import orgFaceDetectionRoutes from './org/face-detection';
 import cameraRoutes from './cameras/index';
 import faceProfileRoutes from './face-profiles/index';
 import recognitionEventRoutes from './recognition-events/index';
@@ -28,6 +29,9 @@ export default async function apiRoutes(app: FastifyInstance): Promise<void> {
 
   // Org admin user management routes: /api/v1/org/users/*
   await app.register(orgUserRoutes, { prefix: '/org/users' });
+
+  // Org face detection routes: /api/v1/org/face-detection/*
+  await app.register(orgFaceDetectionRoutes, { prefix: '/org/face-detection' });
 
   // Camera routes: /api/v1/cameras/*
   await app.register(cameraRoutes, { prefix: '/cameras' });
