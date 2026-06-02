@@ -75,6 +75,8 @@ tags:
     description: Chat moderation — reports and muting
   - name: Camera Settings
     description: Per-camera face detection and alert configuration
+  - name: Face Detection
+    description: Face detection toggle — org-wide defaults and camera-level overrides
   - name: Internal
     description: Internal webhook endpoints (shared-secret auth)
 
@@ -488,6 +490,77 @@ components:
           minimum: 1
           maximum: 1440
           description: Minimum minutes between alerts for this camera
+
+    OrgFaceDetectionSettings:
+      type: object
+      required: [enabled, schedule, duration_until]
+      properties:
+        enabled:
+          type: boolean
+          description: Whether face detection is enabled org-wide
+        schedule:
+          type: object
+          nullable: true
+          description: "Recurring daily window (null = no schedule constraint)"
+          properties:
+            start_time:
+              type: string
+              description: "Start time in HH:MM format"
+              example: "08:00"
+            end_time:
+              type: string
+              description: "End time in HH:MM format"
+              example: "18:00"
+        duration_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: "ISO timestamp when detection expires (null = no expiry)"
+
+    CameraFaceDetectionResponse:
+      type: object
+      required: [camera_override, effective]
+      properties:
+        camera_override:
+          type: object
+          required: [enabled, schedule, duration_until]
+          properties:
+            enabled:
+              type: boolean
+              nullable: true
+              description: "Camera-level override (null = inherit from org)"
+            schedule:
+              type: object
+              nullable: true
+              properties:
+                start_time:
+                  type: string
+                  example: "22:00"
+                end_time:
+                  type: string
+                  example: "06:00"
+            duration_until:
+              type: string
+              format: date-time
+              nullable: true
+        effective:
+          type: object
+          required: [enabled, schedule, active_now]
+          properties:
+            enabled:
+              type: boolean
+              description: Resolved enabled state (camera override or org default)
+            schedule:
+              type: object
+              nullable: true
+              properties:
+                start_time:
+                  type: string
+                end_time:
+                  type: string
+            active_now:
+              type: boolean
+              description: Whether face detection is active right now (considers schedule, duration, timezone)
 
     ChatGroup:
       type: object
@@ -1789,10 +1862,11 @@ paths:
 
   /api/v1/cameras/{cameraId}/credentials:
     get:
-      summary: Download camera IoT credentials
-      description: >
-        Generate and download IoT certificates for a camera.
-        One-time download — returns 409 if credentials were already issued.
+      summary: Get camera IoT credentials
+      description: |
+        Returns IoT certificates for a camera. Idempotent — first call issues
+        new credentials; subsequent calls return the same stored credentials.
+        Org admin only.
       tags:
         - Cameras
       security:
@@ -1811,6 +1885,7 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [device_cert, private_key, root_ca, iot_credential_endpoint, kvs_stream_name, role_alias, region]
                 properties:
                   device_cert:
                     type: string
@@ -1818,9 +1893,9 @@ paths:
                   private_key:
                     type: string
                     description: Private key PEM
-                  root_ca_url:
+                  root_ca:
                     type: string
-                    description: URL to download Amazon Root CA
+                    description: Amazon Root CA1 PEM certificate (inline)
                   iot_credential_endpoint:
                     type: string
                     description: IoT credential provider endpoint
@@ -1833,14 +1908,22 @@ paths:
                   region:
                     type: string
                     description: AWS region
+              example:
+                device_cert: "-----BEGIN CERTIFICATE-----\nMIIDWTCCAkGgAwIBAgIU..."
+                private_key: "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA..."
+                root_ca: "-----BEGIN CERTIFICATE-----\nMIIDQTCCAimgAwIBAgITBmyfz5m..."
+                iot_credential_endpoint: "cscd0v7zb7cyn.credentials.iot.eu-west-2.amazonaws.com"
+                kvs_stream_name: "my-org-cam1"
+                role_alias: "cctv-staging-camera-iot-role-alias"
+                region: "eu-west-2"
+        '400':
+          description: Camera has no IoT Thing provisioned
         '401':
           description: Unauthorized
         '403':
           description: Forbidden — wrong org or not org_admin
         '404':
           description: Camera not found
-        '409':
-          description: Credentials already issued
 
   # ─────────────────────────────────────────────────────────
   # Streaming
@@ -3081,50 +3164,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /api/v1/cameras/{cameraId}/credentials/download:
-    parameters:
-      - name: cameraId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-    get:
-      summary: Download camera credentials as file
-      description: |
-        Issues IoT credentials and returns them as a downloadable PEM file bundle containing
-        the device certificate, private key, and device configuration.
-        Can only be called once per camera (use rotate endpoint to reissue).
-      operationId: downloadCameraCredentials
-      tags: [Camera Settings]
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Credential bundle file
-          content:
-            application/x-pem-file:
-              schema:
-                type: string
-                format: binary
-          headers:
-            Content-Disposition:
-              schema:
-                type: string
-              description: "attachment; filename=\"{thing_name}-credentials.pem\""
-        "400":
-          description: Camera has no IoT Thing provisioned
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "409":
-          description: Credentials already issued
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
   /api/v1/cameras/{cameraId}/recordings/{recordingId}/download:
     parameters:
       - name: cameraId
@@ -3955,8 +3994,275 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   # ─────────────────────────────────────────────────────────
+  # Face Detection (Org + Camera)
+  # ─────────────────────────────────────────────────────────
+  /api/v1/org/face-detection:
+    get:
+      summary: Get org face detection settings
+      description: Returns org-wide face detection defaults (enabled, schedule, duration).
+      operationId: getOrgFaceDetection
+      tags: [Face Detection]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Org face detection settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgFaceDetectionSettings"
+              example:
+                enabled: true
+                schedule: null
+                duration_until: null
+        "403":
+          description: Not an org admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: Update org face detection settings
+      description: |
+        Update org-wide face detection toggle, schedule, or duration.
+        `duration_minutes` and `schedule` are mutually exclusive.
+        Setting `enabled: false` clears schedule and duration.
+      operationId: updateOrgFaceDetection
+      tags: [Face Detection]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  description: Enable or disable face detection org-wide
+                duration_minutes:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                  description: "Enable for N minutes from now (null to clear)"
+                schedule:
+                  type: object
+                  nullable: true
+                  description: "Recurring daily window (null to clear)"
+                  properties:
+                    start_time:
+                      type: string
+                      description: "HH:MM format"
+                      example: "08:00"
+                    end_time:
+                      type: string
+                      description: "HH:MM format"
+                      example: "18:00"
+            examples:
+              enable_with_schedule:
+                summary: Enable with daily schedule
+                value:
+                  enabled: true
+                  schedule: { start_time: "08:00", end_time: "18:00" }
+              enable_for_duration:
+                summary: Enable for 60 minutes
+                value:
+                  enabled: true
+                  duration_minutes: 60
+              disable:
+                summary: Disable entirely
+                value:
+                  enabled: false
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgFaceDetectionSettings"
+        "400":
+          description: Validation error (e.g. both duration and schedule provided)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not an org admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/cameras/{cameraId}/face-detection:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get camera face detection settings
+      description: |
+        Returns camera-level override and effective (resolved) face detection state.
+        If `camera_override.enabled` is null, the camera inherits from org defaults.
+      operationId: getCameraFaceDetection
+      tags: [Face Detection]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Camera face detection settings with effective state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CameraFaceDetectionResponse"
+              example:
+                camera_override:
+                  enabled: null
+                  schedule: null
+                  duration_until: null
+                effective:
+                  enabled: true
+                  schedule: null
+                  active_now: true
+        "403":
+          description: Not an org admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: Update camera face detection override
+      description: |
+        Set a camera-level face detection override. Overrides org defaults for this camera.
+        - `enabled: true/false` — sets camera override
+        - `enabled: null` — clears override (inherit from org)
+        - `duration_minutes` and `schedule` are mutually exclusive
+      operationId: updateCameraFaceDetection
+      tags: [Face Detection]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  nullable: true
+                  description: "true/false to override, null to clear (inherit from org)"
+                duration_minutes:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                  description: "Enable for N minutes from now (null to clear)"
+                schedule:
+                  type: object
+                  nullable: true
+                  description: "Recurring daily window (null to clear)"
+                  properties:
+                    start_time:
+                      type: string
+                      example: "22:00"
+                    end_time:
+                      type: string
+                      example: "06:00"
+            examples:
+              disable_camera:
+                summary: Disable face detection on this camera
+                value:
+                  enabled: false
+              overnight_schedule:
+                summary: Enable with overnight schedule
+                value:
+                  enabled: true
+                  schedule: { start_time: "22:00", end_time: "06:00" }
+              clear_override:
+                summary: Clear override (inherit from org)
+                value:
+                  enabled: null
+      responses:
+        "200":
+          description: Updated camera face detection state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CameraFaceDetectionResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not an org admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Camera not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────────────────
   # Internal Webhooks
   # ─────────────────────────────────────────────────────────
+  /internal/cameras/{cameraId}/face-detection-active:
+    get:
+      summary: Check if face detection is active for camera
+      description: |
+        Returns whether face detection is currently active for the given camera,
+        considering org defaults, camera overrides, schedules, duration, and timezone.
+        Used by Lambda pipeline to decide whether to run face recognition.
+      operationId: isFaceDetectionActive
+      tags: [Internal]
+      security: []
+      parameters:
+        - name: cameraId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-internal-secret
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret for internal service auth
+      responses:
+        "200":
+          description: Active status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [active]
+                properties:
+                  active:
+                    type: boolean
+              example:
+                active: true
+        "401":
+          description: Invalid or missing internal secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /internal/cameras/status:
     post:
       summary: Update camera status
