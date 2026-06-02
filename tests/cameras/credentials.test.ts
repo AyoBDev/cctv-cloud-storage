@@ -59,7 +59,7 @@ describe('Camera Credentials', () => {
       const body = res.json<{
         device_cert: string;
         private_key: string;
-        root_ca_url: string;
+        root_ca: string;
         iot_credential_endpoint: string;
         kvs_stream_name: string;
         role_alias: string;
@@ -68,38 +68,37 @@ describe('Camera Credentials', () => {
 
       expect(body.device_cert).toContain('BEGIN CERTIFICATE');
       expect(body.private_key).toContain('BEGIN RSA PRIVATE KEY');
-      expect(body.root_ca_url).toContain('amazontrust.com');
+      expect(body.root_ca).toContain('BEGIN CERTIFICATE');
+      expect(body.root_ca).toContain('MIIDQTCCAimgAwIBAgITBmyfz5m');
       expect(body.iot_credential_endpoint).toBeTruthy();
       expect(body.kvs_stream_name).toMatch(/^[a-z0-9-]+-cam\d+$/);
       expect(body.role_alias).toBeTruthy();
       expect(body.region).toBeTruthy();
     });
 
-    it('returns 409 on second download attempt', async () => {
+    it('returns 200 with same data on second download (idempotent)', async () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/cameras/${cameraId}/credentials`,
         headers: { authorization: `Bearer ${orgAdminAccessToken}` },
       });
 
-      expect(res.statusCode).toBe(409);
-      const body = res.json<{ error: { code: string; message: string } }>();
-      expect(body.error.message).toContain('already issued');
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{
+        device_cert: string;
+        private_key: string;
+        root_ca: string;
+      }>();
+
+      expect(body.device_cert).toContain('BEGIN CERTIFICATE');
+      expect(body.private_key).toContain('BEGIN RSA PRIVATE KEY');
+      expect(body.root_ca).toContain('BEGIN CERTIFICATE');
     });
 
-    it('returns 403 for viewer (requireOrgAdmin)', async () => {
-      // Create a fresh camera so credentials haven't been issued
-      const camRes = await app.inject({
-        method: 'POST',
-        url: '/api/v1/cameras',
-        headers: { authorization: `Bearer ${orgAdminAccessToken}` },
-        payload: { name: 'Viewer Creds Test' },
-      });
-      const freshCamId = camRes.json<{ id: string }>().id;
-
+    it('returns 403 for viewer', async () => {
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/cameras/${freshCamId}/credentials`,
+        url: `/api/v1/cameras/${cameraId}/credentials`,
         headers: { authorization: `Bearer ${viewerAccessToken}` },
       });
 
@@ -107,7 +106,6 @@ describe('Camera Credentials', () => {
     });
 
     it('returns 403 for wrong org', async () => {
-      // Create a second org
       const org2 = await createOrgAndLogin(app, superAdminToken, 'creds-org2');
 
       const res = await app.inject({

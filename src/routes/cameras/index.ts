@@ -13,11 +13,14 @@ import {
 } from '@services/camera.service';
 import { isViewerAssigned, addViewersToCamera } from '@services/assignment.service';
 import { issueCredentials, getCredentialEndpoint } from '@services/iot.service';
+import { encryptRtspUrl, decryptRtspUrl } from '@utils/kms';
+import { AMAZON_ROOT_CA1 } from '@utils/amazon-root-ca';
 import { env } from '@config/env';
 import { AppError } from '@utils/errors';
 import cameraViewerRoutes from './viewers';
 import cameraRecordingRoutes from './recordings';
 import cameraSettingsRoutes from './settings';
+import cameraFaceDetectionRoutes from './face-detection';
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -344,7 +347,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
             properties: {
               device_cert: { type: 'string' },
               private_key: { type: 'string' },
-              root_ca_url: { type: 'string' },
+              root_ca: { type: 'string' },
               iot_credential_endpoint: { type: 'string' },
               kvs_stream_name: { type: 'string' },
               role_alias: { type: 'string' },
@@ -353,13 +356,12 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
           },
         },
       },
-      preHandler: [requireUser],
+      preHandler: [requireOrgAdmin],
     },
     async (request, reply) => {
       const params = cameraIdParamsSchema.parse(request.params);
       const orgId = request.user.org_id!;
 
-      // Fetch camera and verify ownership
       const rows = await app.db<
         Array<{
           id: string;
@@ -367,10 +369,13 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
           iot_thing_name: string | null;
           kvs_stream_name: string;
           credentials_issued: boolean;
+          iot_certificate_pem_encrypted: string | null;
+          iot_private_key_encrypted: string | null;
           is_active: boolean;
         }>
       >`
-        SELECT id, org_id, iot_thing_name, kvs_stream_name, credentials_issued, is_active
+        SELECT id, org_id, iot_thing_name, kvs_stream_name, credentials_issued,
+               iot_certificate_pem_encrypted, iot_private_key_encrypted, is_active
         FROM cameras
         WHERE id = ${params.cameraId} AND is_active = true
       `;
@@ -379,31 +384,50 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
       if (!camera) throw AppError.notFound('Camera not found');
       if (camera.org_id !== orgId) throw AppError.forbidden('Access denied');
 
-      // Viewers can only access credentials for assigned cameras
-      if (request.user.role === 'viewer') {
-        const assigned = await isViewerAssigned(app.db, params.cameraId, request.user.sub);
-        if (!assigned) {
-          throw AppError.forbidden('Camera not assigned to you');
-        }
-      }
-      if (camera.credentials_issued) {
-        throw AppError.conflict('Credentials already issued. Use rotate endpoint to reissue.');
-      }
       if (!camera.iot_thing_name) {
         throw AppError.badRequest('Camera has no IoT Thing provisioned');
       }
 
-      // Issue credentials
-      const creds = await issueCredentials(app.iot, camera.iot_thing_name, env.IOT_POLICY_NAME);
-
-      // Get cached credential endpoint
       const endpoint = await getCredentialEndpoint(app.iot);
 
-      // Update DB with cert details
+      if (camera.credentials_issued) {
+        if (!camera.iot_certificate_pem_encrypted || !camera.iot_private_key_encrypted) {
+          throw AppError.badRequest('Stored credentials missing — use rotate endpoint');
+        }
+
+        const deviceCert = await decryptRtspUrl(
+          app.kms,
+          env.KMS_KEY_ID,
+          camera.iot_certificate_pem_encrypted,
+        );
+        const privateKey = await decryptRtspUrl(
+          app.kms,
+          env.KMS_KEY_ID,
+          camera.iot_private_key_encrypted,
+        );
+
+        return reply.code(200).send({
+          device_cert: deviceCert,
+          private_key: privateKey,
+          root_ca: AMAZON_ROOT_CA1,
+          iot_credential_endpoint: endpoint,
+          kvs_stream_name: camera.kvs_stream_name,
+          role_alias: env.IOT_ROLE_ALIAS,
+          region: env.AWS_REGION,
+        });
+      }
+
+      const creds = await issueCredentials(app.iot, camera.iot_thing_name, env.IOT_POLICY_NAME);
+
+      const encryptedCert = await encryptRtspUrl(app.kms, env.KMS_KEY_ID, creds.certificatePem);
+      const encryptedKey = await encryptRtspUrl(app.kms, env.KMS_KEY_ID, creds.privateKey);
+
       await app.db`
         UPDATE cameras
         SET iot_certificate_id = ${creds.certificateId},
             iot_certificate_arn = ${creds.certificateArn},
+            iot_certificate_pem_encrypted = ${encryptedCert},
+            iot_private_key_encrypted = ${encryptedKey},
             credentials_issued = true,
             credentials_issued_at = now()
         WHERE id = ${params.cameraId}
@@ -412,7 +436,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(200).send({
         device_cert: creds.certificatePem,
         private_key: creds.privateKey,
-        root_ca_url: 'https://www.amazontrust.com/repository/AmazonRootCA1.pem',
+        root_ca: AMAZON_ROOT_CA1,
         iot_credential_endpoint: endpoint,
         kvs_stream_name: camera.kvs_stream_name,
         role_alias: env.IOT_ROLE_ALIAS,
@@ -618,4 +642,7 @@ export default async function cameraRoutes(app: FastifyInstance): Promise<void> 
 
   // Camera settings routes: /api/v1/cameras/:cameraId/settings/*
   await app.register(cameraSettingsRoutes, { prefix: '/:cameraId/settings' });
+
+  // Camera face detection routes: /api/v1/cameras/:cameraId/face-detection/*
+  await app.register(cameraFaceDetectionRoutes, { prefix: '/:cameraId/face-detection' });
 }
