@@ -19,7 +19,7 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import postgres from 'postgres';
 
 const REGION = 'eu-west-1';
-const MEDIA_BUCKET = 'cctv-staging-media';
+const MEDIA_BUCKET = 'olympusvision-staging-media';
 const COLLECTION_PREFIX = 'collection-';
 
 const rekognition = new RekognitionClient({ region: REGION });

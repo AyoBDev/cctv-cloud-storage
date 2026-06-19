@@ -62,8 +62,8 @@ module "storage" {
 
   project           = local.project
   environment       = local.environment
-  video_bucket_name = "${local.project}-${local.environment}-video"
-  media_bucket_name = "${local.project}-${local.environment}-media"
+  video_bucket_name = "olympusvision-${local.environment}-video"
+  media_bucket_name = "olympusvision-${local.environment}-media"
 }
 
 # ---------------------------------------------------------------------------
