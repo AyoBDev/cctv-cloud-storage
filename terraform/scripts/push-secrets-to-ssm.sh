@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ENVIRONMENT="${1:-staging}"
-REGION="${AWS_REGION:-eu-west-2}"
+REGION="${AWS_REGION:-eu-west-1}"
 PREFIX="/cctv/${ENVIRONMENT}"
 
 # Load .env from project root
