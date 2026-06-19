@@ -1,3 +1,15 @@
+/**
+ * migrate-rekognition.ts
+ *
+ * Re-indexes all face profiles in Rekognition collections for the new AWS account.
+ *
+ * IMPORTANT: Set AWS_PROFILE before running this script:
+ *   AWS_PROFILE=olympusvision npx tsx scripts/migrate-rekognition.ts
+ *
+ * The AWS SDK v3 automatically reads AWS_PROFILE environment variable to determine
+ * which account credentials to use from ~/.aws/credentials
+ */
+
 import {
   RekognitionClient,
   CreateCollectionCommand,

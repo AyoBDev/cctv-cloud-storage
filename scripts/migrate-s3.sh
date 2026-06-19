@@ -1,4 +1,18 @@
 #!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# migrate-s3.sh
+#
+# Syncs S3 video and media buckets from staging to the new account.
+#
+# IMPORTANT: For cross-account S3 copy, ensure:
+# 1. The source bucket (eu-west-2) allows GetObject/ListBucket for the destination AWS account
+# 2. The destination bucket policy allows PutObject from the destination account
+# 3. Both buckets are in their respective regions
+#
+# If cross-account bucket policy is not in place, use a two-step approach:
+#   aws s3 sync s3://cctv-staging-video . --profile olympusvision --region eu-west-2
+#   aws s3 sync . s3://cctv-staging-video --profile olympusvision --region eu-west-1
+# ---------------------------------------------------------------------------
 set -euo pipefail
 
 SOURCE_PROFILE="${1:-default}"
