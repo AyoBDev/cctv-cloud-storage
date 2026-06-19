@@ -15,20 +15,23 @@ terraform {
   backend "s3" {
     bucket         = "cctv-cloud-storage-tf-state"
     key            = "staging/terraform.tfstate"
-    region         = "eu-west-2"
+    region         = "eu-west-1"
     dynamodb_table = "cctv-cloud-terraform-state-lock"
     encrypt        = true
+    profile        = "olympusvision"
   }
 }
 
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = "olympusvision"
 
   default_tags {
     tags = {
       Project     = local.project
       Environment = local.environment
       ManagedBy   = "terraform"
+      aws-apn-id  = "pc:8l8gcn23lmlgammd8572tk6va"
     }
   }
 }
