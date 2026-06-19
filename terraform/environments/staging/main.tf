@@ -13,7 +13,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "cctv-cloud-storage-tf-state"
+    bucket         = "olympusvision-tf-state"
     key            = "staging/terraform.tfstate"
     region         = "eu-west-1"
     dynamodb_table = "cctv-cloud-terraform-state-lock"

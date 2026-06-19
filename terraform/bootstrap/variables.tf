@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "state_bucket_name" {
   description = "S3 bucket name for Terraform remote state"
   type        = string
-  default     = "cctv-cloud-storage-tf-state"
+  default     = "olympusvision-tf-state"
 }
 
 variable "dynamodb_table_name" {
