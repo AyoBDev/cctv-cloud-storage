@@ -111,7 +111,7 @@ curl -o ~/certs/root-ca.pem $(jq -r '.root_ca_url' credentials.json)
 ### Set Environment Variables
 
 ```bash
-export AWS_DEFAULT_REGION=eu-west-2
+export AWS_DEFAULT_REGION=eu-west-1
 export CERT_PATH=$HOME/certs/device.crt
 export PRIVATE_KEY_PATH=$HOME/certs/private.key
 export CA_CERT_PATH=$HOME/certs/root-ca.pem
@@ -160,7 +160,7 @@ Create a script `~/start-cameras.sh`:
 
 # Camera 1
 (
-  export AWS_DEFAULT_REGION=eu-west-2
+  export AWS_DEFAULT_REGION=eu-west-1
   export CERT_PATH=$HOME/certs/camera1/device.crt
   export PRIVATE_KEY_PATH=$HOME/certs/camera1/private.key
   export CA_CERT_PATH=$HOME/certs/camera1/root-ca.pem
@@ -172,7 +172,7 @@ Create a script `~/start-cameras.sh`:
 
 # Camera 2
 (
-  export AWS_DEFAULT_REGION=eu-west-2
+  export AWS_DEFAULT_REGION=eu-west-1
   export CERT_PATH=$HOME/certs/camera2/device.crt
   export PRIVATE_KEY_PATH=$HOME/certs/camera2/private.key
   export CA_CERT_PATH=$HOME/certs/camera2/root-ca.pem
@@ -223,7 +223,7 @@ chmod +x ~/start-cameras.sh
 - This is usually IPv6 on the Pi interfering. See the "Disable IPv6" section above.
 - Test manually:
   ```bash
-  curl -v https://<endpoint>.credentials.iot.eu-west-2.amazonaws.com/role-aliases/<alias>/credentials \
+  curl -v https://<endpoint>.credentials.iot.eu-west-1.amazonaws.com/role-aliases/<alias>/credentials \
     --cert ~/certs/device.crt \
     --key ~/certs/private.key \
     --cacert ~/certs/root-ca.pem

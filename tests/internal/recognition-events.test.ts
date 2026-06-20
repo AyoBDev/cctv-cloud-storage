@@ -22,6 +22,14 @@ describe('Internal Recognition Events', () => {
       payload: { name: 'Internal Test Camera' },
     });
     cameraId = camRes.json<{ id: string }>().id;
+
+    // Enable face detection on the camera
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/cameras/${cameraId}/settings`,
+      headers: { authorization: `Bearer ${org.orgAdminAccessToken}` },
+      payload: { face_detection_enabled: true },
+    });
   });
 
   afterAll(async () => {

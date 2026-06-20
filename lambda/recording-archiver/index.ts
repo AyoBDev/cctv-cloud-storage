@@ -6,7 +6,7 @@ import {
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 
-const region = process.env['AWS_REGION'] ?? 'eu-west-2';
+const region = process.env['AWS_REGION'] ?? 'eu-west-1';
 const internalApiUrl = process.env['INTERNAL_API_URL'] ?? '';
 const ssmPrefix = process.env['SSM_PREFIX'] ?? '';
 const mediaBucket = process.env['MEDIA_BUCKET'] ?? '';
