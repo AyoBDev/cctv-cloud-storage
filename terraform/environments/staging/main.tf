@@ -145,6 +145,21 @@ module "iot" {
 }
 
 # ---------------------------------------------------------------------------
+# KVS — prerequisite: activate KVS in the AWS Console before applying.
+# Visit https://console.aws.amazon.com/kinesisvideo in eu-west-1 to subscribe.
+# Camera streams are created dynamically by the API on camera registration.
+# ---------------------------------------------------------------------------
+resource "aws_kinesis_video_stream" "service_activation" {
+  name                    = "${local.project}-${local.environment}-service-activation"
+  data_retention_in_hours = 1
+
+  tags = {
+    Name    = "${local.project}-${local.environment}-service-activation"
+    Purpose = "Activates KVS service in account"
+  }
+}
+
+# ---------------------------------------------------------------------------
 # Notifications (uncomment when SES domain is available)
 # ---------------------------------------------------------------------------
 # module "notifications" {
