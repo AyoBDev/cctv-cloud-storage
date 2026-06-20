@@ -83,8 +83,8 @@ async function reindexFace(profile: FaceProfile): Promise<string | null> {
 async function main() {
   console.log('=== Rekognition Face Re-indexing Migration ===\n');
 
-  const orgs = await db<{ id: string }[]>`SELECT id FROM organisations`;
-  console.log(`Found ${orgs.length} organisations\n`);
+  const orgs = await db<{ id: string }[]>`SELECT id FROM organizations`;
+  console.log(`Found ${orgs.length} organizations\n`);
 
   for (const org of orgs) {
     console.log(`Processing org: ${org.id}`);
