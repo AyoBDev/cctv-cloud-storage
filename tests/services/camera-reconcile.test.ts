@@ -1,9 +1,6 @@
 import postgres from 'postgres';
 import { Redis } from 'ioredis';
-import {
-  getReconcilableCameras,
-  reconcileCameraStatuses,
-} from '@services/camera.service';
+import { getReconcilableCameras, reconcileCameraStatuses } from '@services/camera.service';
 
 const db = postgres(process.env['DATABASE_URL']!);
 const redis = new Redis(process.env['REDIS_URL']!);

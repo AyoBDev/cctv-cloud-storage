@@ -456,9 +456,7 @@ export async function updateCameraStatus(
  * active cameras that are not permanently deactivated. Used by the reconciler
  * to decide which KVS streams to probe for recent media.
  */
-export async function getReconcilableCameras(
-  db: Sql,
-): Promise<{ kvs_stream_name: string }[]> {
+export async function getReconcilableCameras(db: Sql): Promise<{ kvs_stream_name: string }[]> {
   return db<{ kvs_stream_name: string }[]>`
     SELECT kvs_stream_name FROM cameras
     WHERE is_active = true AND status <> 'inactive'
@@ -501,9 +499,7 @@ export async function reconcileCameraStatuses(
     const changedOrgIds = new Set<string>();
 
     for (const u of updates) {
-      const rows = await tx<
-        { id: string; org_id: string; status: string }[]
-      >`
+      const rows = await tx<{ id: string; org_id: string; status: string }[]>`
         SELECT id, org_id, status FROM cameras
         WHERE kvs_stream_name = ${u.kvs_stream_name} AND is_active = true
       `;
