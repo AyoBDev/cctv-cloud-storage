@@ -214,6 +214,29 @@ chmod +x ~/start-cameras.sh
 - Check the Monitoring tab for PutMedia activity — if present, the stream works
 - Try Chrome (best codec support for KVS HLS)
 
+### Camera stuck on `provisioning` (no live view, no recording)
+Live view and recording both require the camera's status to be `online`. Once
+the producer is streaming to KVS, the **camera status reconciler** (a Lambda on
+a 1-minute schedule) detects recent fragments via `ListFragments` and promotes
+the camera to `online` automatically — no manual step is needed. Allow ~1–2
+minutes after the stream starts.
+
+If the camera is still `provisioning` after a couple of minutes:
+- Confirm PutMedia activity in the KVS Monitoring tab (the reconciler only sees
+  cameras that are actually pushing fragments).
+- Check the reconciler Lambda logs: CloudWatch group
+  `/aws/lambda/cctv-staging-camera-status-reconciler`.
+- Verify the reconciler's `INTERNAL_API_URL` is the HTTPS domain
+  (`https://api.olympusvisions.com`), not `http://<alb-dns>` — an HTTP ALB URL
+  301-redirects and the reconcile POST body is dropped across the redirect.
+- As a one-time manual override you can POST to `/internal/cameras/status`
+  (see the internal API), but the reconciler makes this unnecessary in normal
+  operation.
+
+A camera is demoted back to `offline` only after it stops sending fragments for
+longer than the grace window (`RECONCILE_GRACE_SECONDS`, default 600s), so brief
+network blips do not flap the status.
+
 ### Authentication errors
 - Ensure certificate file paths are absolute (not relative)
 - Verify the credential endpoint is correct for your region
