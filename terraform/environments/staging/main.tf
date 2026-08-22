@@ -125,8 +125,11 @@ module "lambda" {
   private_subnet_ids        = module.networking.private_subnet_ids
   lambda_sg_id              = module.networking.lambda_sg_id
   media_bucket_name         = module.storage.media_bucket_name
-  internal_api_url          = "http://${module.compute.alb_dns_name}"
-  aws_account_id            = data.aws_caller_identity.current.account_id
+  # Must be the HTTPS domain, not http://<alb-dns>: the ALB 301-redirects
+  # http→https and curl/fetch drop the POST body across a 301, so status/
+  # recording webhooks silently fail. Verified working: https://api.olympusvisions.com
+  internal_api_url = "https://api.olympusvisions.com"
+  aws_account_id   = data.aws_caller_identity.current.account_id
 }
 
 # ---------------------------------------------------------------------------
