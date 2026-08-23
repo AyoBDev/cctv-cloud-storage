@@ -27,6 +27,14 @@ describe('Recognition Events', () => {
     });
     cameraId = camRes.json<{ id: string }>().id;
 
+    // Enable face detection on the camera
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/cameras/${cameraId}/settings`,
+      headers: { authorization: `Bearer ${orgAdminAccessToken}` },
+      payload: { face_detection_enabled: true },
+    });
+
     // Seed a recognition event via internal endpoint
     const internalSecret = process.env['INTERNAL_API_SECRET'] ?? 'test-internal-secret-1234567890';
     const seedRes = await app.inject({

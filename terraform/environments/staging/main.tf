@@ -13,22 +13,25 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "cctv-cloud-storage-tf-state"
+    bucket         = "olympusvision-tf-state"
     key            = "staging/terraform.tfstate"
-    region         = "eu-west-2"
+    region         = "eu-west-1"
     dynamodb_table = "cctv-cloud-terraform-state-lock"
     encrypt        = true
+    profile        = "olympusvision"
   }
 }
 
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = "olympusvision"
 
   default_tags {
     tags = {
       Project     = local.project
       Environment = local.environment
       ManagedBy   = "terraform"
+      aws-apn-id  = "pc:8l8gcn23lmlgammd8572tk6va"
     }
   }
 }
@@ -59,8 +62,8 @@ module "storage" {
 
   project           = local.project
   environment       = local.environment
-  video_bucket_name = "${local.project}-${local.environment}-video"
-  media_bucket_name = "${local.project}-${local.environment}-media"
+  video_bucket_name = "olympusvision-${local.environment}-video"
+  media_bucket_name = "olympusvision-${local.environment}-media"
 }
 
 # ---------------------------------------------------------------------------
@@ -142,6 +145,21 @@ module "iot" {
   environment    = local.environment
   aws_region     = var.aws_region
   aws_account_id = data.aws_caller_identity.current.account_id
+}
+
+# ---------------------------------------------------------------------------
+# KVS — prerequisite: activate KVS in the AWS Console before applying.
+# Visit https://console.aws.amazon.com/kinesisvideo in eu-west-1 to subscribe.
+# Camera streams are created dynamically by the API on camera registration.
+# ---------------------------------------------------------------------------
+resource "aws_kinesis_video_stream" "service_activation" {
+  name                    = "${local.project}-${local.environment}-service-activation"
+  data_retention_in_hours = 1
+
+  tags = {
+    Name    = "${local.project}-${local.environment}-service-activation"
+    Purpose = "Activates KVS service in account"
+  }
 }
 
 # ---------------------------------------------------------------------------

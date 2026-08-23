@@ -7,12 +7,19 @@
 #
 # Run ONCE before terraform apply for each environment.
 # Usage: ./terraform/scripts/push-secrets-to-ssm.sh [staging|production]
+#
+# IMPORTANT: Set AWS_PROFILE before running this script:
+#   AWS_PROFILE=olympusvision ./terraform/scripts/push-secrets-to-ssm.sh staging
+#
+# The AWS SDK automatically reads AWS_PROFILE to determine which account
+# credentials to use from ~/.aws/credentials
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
 ENVIRONMENT="${1:-staging}"
-REGION="${AWS_REGION:-eu-west-2}"
+REGION="${AWS_REGION:-eu-west-1}"
 PREFIX="/cctv/${ENVIRONMENT}"
+PROFILE="${AWS_PROFILE:-olympusvision}"
 
 # Load .env from project root
 ENV_FILE="$(git rev-parse --show-toplevel)/.env"
@@ -44,6 +51,7 @@ put_param() {
   echo "  Pushing ${PREFIX}/${name} ..."
   aws ssm put-parameter \
     --region "$REGION" \
+    --profile "$PROFILE" \
     --name "${PREFIX}/${name}" \
     --value "$value" \
     --type "$type" \

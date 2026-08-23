@@ -35,8 +35,8 @@ info:
     name: Backend Team
 
 servers:
-  - url: http://cctv-staging-alb-1931384586.eu-west-2.elb.amazonaws.com
-    description: Staging (AWS ECS — eu-west-2)
+  - url: http://cctv-staging-alb-2122083267.eu-west-1.elb.amazonaws.com
+    description: Staging (AWS ECS — eu-west-1)
   - url: http://localhost:3000
     description: Local development
 
@@ -1912,10 +1912,10 @@ paths:
                 device_cert: "-----BEGIN CERTIFICATE-----\nMIIDWTCCAkGgAwIBAgIU..."
                 private_key: "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA..."
                 root_ca: "-----BEGIN CERTIFICATE-----\nMIIDQTCCAimgAwIBAgITBmyfz5m..."
-                iot_credential_endpoint: "cscd0v7zb7cyn.credentials.iot.eu-west-2.amazonaws.com"
+                iot_credential_endpoint: "cscd0v7zb7cyn.credentials.iot.eu-west-1.amazonaws.com"
                 kvs_stream_name: "my-org-cam1"
                 role_alias: "cctv-staging-camera-iot-role-alias"
-                region: "eu-west-2"
+                region: "eu-west-1"
         '400':
           description: Camera has no IoT Thing provisioned
         '401':
@@ -1955,7 +1955,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/HlsStream"
               example:
-                hls_url: "https://b-1234abcd.kinesisvideo.eu-west-2.amazonaws.com/hls/v1/getHLSMasterPlaylist.m3u8?SessionToken=..."
+                hls_url: "https://b-1234abcd.kinesisvideo.eu-west-1.amazonaws.com/hls/v1/getHLSMasterPlaylist.m3u8?SessionToken=..."
                 expires_in: 900
         "400":
           description: Camera is not online
@@ -2555,7 +2555,7 @@ paths:
                     end_time: "2026-05-10T11:00:00.000Z"
                     duration_seconds: 3600
                     file_size_bytes: 524288000
-                    playback_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/recording.mp4?X-Amz-..."
+                    playback_url: "https://olympusvision-staging-media.s3.eu-west-1.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/recording.mp4?X-Amz-..."
                     created_at: "2026-05-10T11:00:05.000Z"
                 pagination:
                   cursor: "850e8400-e29b-41d4-a716-446655440000"
@@ -2624,7 +2624,7 @@ paths:
                 duration_seconds: 3600
                 file_size_bytes: 524288000
                 created_at: "2026-05-10T11:00:05.000Z"
-                playback_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/recording-850e8400.mp4?X-Amz-..."
+                playback_url: "https://olympusvision-staging-media.s3.eu-west-1.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/recording-850e8400.mp4?X-Amz-..."
         "401":
           description: Unauthorized
           content:
@@ -2729,7 +2729,7 @@ paths:
                 org_id: "550e8400-e29b-41d4-a716-446655440000"
                 face_id: "1a2b3c4d-5e6f-7g8h-9i0j-k1l2m3n4o5p6"
                 label: "John Doe"
-                image_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/faces/650e8400.jpg"
+                image_url: "https://olympusvision-staging-media.s3.eu-west-1.amazonaws.com/orgs/550e8400/faces/650e8400.jpg"
                 created_by: "660e8400-e29b-41d4-a716-446655440000"
                 created_at: "2026-05-09T12:00:00.000Z"
                 updated_at: "2026-05-09T12:00:00.000Z"
@@ -2919,7 +2919,7 @@ paths:
                     face_profile_id: "650e8400-e29b-41d4-a716-446655440000"
                     event_type: "known_face"
                     confidence: 98.5
-                    thumbnail_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/events/750e8400.jpg"
+                    thumbnail_url: "https://olympusvision-staging-media.s3.eu-west-1.amazonaws.com/orgs/550e8400/events/750e8400.jpg"
                     unknown_face_id: null
                     created_at: "2026-05-09T12:00:00.000Z"
                 pagination:
@@ -3193,7 +3193,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/RecordingDownload"
               example:
-                download_url: "https://cctv-staging-media.s3.eu-west-2.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/clip-001.mp4?X-Amz-..."
+                download_url: "https://olympusvision-staging-media.s3.eu-west-1.amazonaws.com/orgs/550e8400/cameras/660e8400/2026-05-10/clip-001.mp4?X-Amz-..."
                 file_name: "clip-001.mp4"
                 file_size_bytes: 524288000
                 content_type: "video/mp4"
@@ -4451,7 +4451,7 @@ paths:
                   - id: "660e8400-e29b-41d4-a716-446655440000"
                     org_id: "550e8400-e29b-41d4-a716-446655440000"
                     kvs_stream_name: "acme-front-door"
-                    kvs_stream_arn: "arn:aws:kinesisvideo:eu-west-2:774305598371:stream/acme-front-door/1234567890123"
+                    kvs_stream_arn: "arn:aws:kinesisvideo:eu-west-1:297315790712:stream/acme-front-door/1234567890123"
                   - id: "660e8400-e29b-41d4-a716-446655440001"
                     org_id: "550e8400-e29b-41d4-a716-446655440000"
                     kvs_stream_name: "acme-back-door"
