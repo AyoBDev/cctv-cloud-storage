@@ -1,6 +1,11 @@
 output "alb_dns_name" {
-  description = "Public URL of the staging API"
-  value       = "http://${module.compute.alb_dns_name}"
+  description = "Raw ALB DNS name (internal/HTTP)"
+  value       = module.compute.alb_dns_name
+}
+
+output "api_url" {
+  description = "Public URL of the staging API (HTTPS custom domain when configured)"
+  value       = module.compute.api_url
 }
 
 output "ecr_repository_url" {

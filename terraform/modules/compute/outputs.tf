@@ -18,3 +18,8 @@ output "alb_dns_name" {
 output "alb_arn" {
   value = aws_lb.main.arn
 }
+
+output "api_url" {
+  description = "Public HTTPS URL of the API (falls back to HTTP ALB DNS when no custom domain is set)"
+  value       = var.api_domain == "" ? "http://${aws_lb.main.dns_name}" : "https://${var.api_domain}"
+}
