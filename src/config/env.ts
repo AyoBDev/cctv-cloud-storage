@@ -28,6 +28,10 @@ const envSchema = z.object({
 
   INTERNAL_API_SECRET: z.string().min(16),
 
+  // Grace window (seconds) before a camera with no recent KVS media is demoted
+  // from 'online' to 'offline' by the status reconciler.
+  RECONCILE_GRACE_SECONDS: z.coerce.number().int().positive().default(600),
+
   AWS_REGION: z.string().default('eu-west-1'),
   KMS_KEY_ID: z.string().default(''),
   IOT_POLICY_NAME: z.string().default(''),
