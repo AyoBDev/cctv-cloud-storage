@@ -59,6 +59,13 @@ const envSchema = z.object({
     .url()
     .default('https://www.olympusvisions.com/marketplace/register'),
   MARKETPLACE_REGISTRATION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+  // AWS only answers ResolveCustomer/GetEntitlements for the account that published
+  // the listing. When that seller account is not the one the API runs in, set this to
+  // a role in the seller account; empty means "use the task role directly".
+  MARKETPLACE_SELLER_ROLE_ARN: z
+    .string()
+    .regex(/^(arn:aws[a-z-]*:iam::\d{12}:role\/.+)?$/, 'Must be an IAM role ARN or empty')
+    .default(''),
 });
 
 function parseEnv() {
