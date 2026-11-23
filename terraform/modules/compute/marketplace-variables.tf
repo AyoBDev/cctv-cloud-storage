@@ -24,3 +24,9 @@ variable "marketplace_registration_page_url" {
   type        = string
   default     = "https://www.olympusvisions.com/marketplace/register"
 }
+
+variable "marketplace_seller_role_arn" {
+  description = "Seller-account role the API assumes for Marketplace calls. Empty uses the task role directly."
+  type        = string
+  default     = ""
+}

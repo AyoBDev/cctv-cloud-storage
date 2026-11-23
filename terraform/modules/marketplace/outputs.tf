@@ -13,3 +13,8 @@ output "function_name" {
 output "alerts_topic_arn" {
   value = aws_sns_topic.alerts.arn
 }
+
+output "marketplace_region_event_bus_arn" {
+  description = "Default bus the seller account forwards Marketplace events to"
+  value       = local.marketplace_default_bus_arn
+}

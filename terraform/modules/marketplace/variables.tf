@@ -20,16 +20,9 @@ variable "internal_api_url" {
 }
 
 variable "agreement_event_types" {
-  description = "AWS Marketplace agreement/license event names to deliver. Each is matched in both its '- Manufacturer' and '- Proposer' variant."
+  description = "Override the Marketplace event names to deliver. null uses the shared list in modules/marketplace-event-pattern."
   type        = list(string)
-  default = [
-    "Purchase Agreement Created",
-    "Purchase Agreement Amended",
-    "Purchase Agreement Ended",
-    "License Updated",
-    "License Deprovisioned",
-    "Purchase Agreement Free Trial Converted",
-  ]
+  default     = null
 }
 
 variable "reconcile_schedule_expression" {
@@ -80,4 +73,15 @@ variable "alarm_email" {
   description = "Email subscribed to marketplace alarms. Empty creates the topic without a subscription."
   type        = string
   default     = ""
+}
+
+variable "seller_account_id" {
+  description = "AWS account that owns the Marketplace listing, when it differs from this account. Empty means same-account (no bus policy)."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = can(regex("^([0-9]{12})?$", var.seller_account_id))
+    error_message = "seller_account_id must be a 12-digit account ID or empty."
+  }
 }

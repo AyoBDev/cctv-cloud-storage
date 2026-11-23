@@ -142,7 +142,8 @@ resource "aws_ecs_task_definition" "api" {
       { name = "MARKETPLACE_PRODUCT_CODE", value = var.marketplace_product_code },
       { name = "MARKETPLACE_CAMERA_DIMENSION", value = var.marketplace_camera_dimension },
       { name = "MARKETPLACE_ENTITLEMENT_REGION", value = var.marketplace_entitlement_region },
-      { name = "MARKETPLACE_REGISTRATION_PAGE_URL", value = var.marketplace_registration_page_url }
+      { name = "MARKETPLACE_REGISTRATION_PAGE_URL", value = var.marketplace_registration_page_url },
+      { name = "MARKETPLACE_SELLER_ROLE_ARN", value = var.marketplace_seller_role_arn }
     ]
 
     secrets = [

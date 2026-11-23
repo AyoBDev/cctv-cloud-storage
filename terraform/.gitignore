@@ -28,3 +28,6 @@ terraform.rc
 # Secrets — never commit
 *.tfvars.local
 secrets.auto.tfvars
+
+# Seller account values (real account IDs) stay with whoever applies it
+seller/terraform.tfvars

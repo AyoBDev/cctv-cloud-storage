@@ -73,6 +73,8 @@ module "iam" {
   environment       = local.environment
   video_bucket_name = module.storage.video_bucket_name
   media_bucket_name = module.storage.media_bucket_name
+
+  marketplace_seller_role_arn = var.marketplace_seller_role_arn
 }
 
 # ---------------------------------------------------------------------------
@@ -103,6 +105,7 @@ module "compute" {
   marketplace_camera_dimension      = var.marketplace_camera_dimension
   marketplace_entitlement_region    = var.marketplace_region
   marketplace_registration_page_url = var.marketplace_registration_page_url
+  marketplace_seller_role_arn       = var.marketplace_seller_role_arn
 
   project                     = local.project
   environment                 = local.environment
