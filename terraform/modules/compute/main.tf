@@ -128,17 +128,21 @@ resource "aws_ecs_task_definition" "api" {
     }]
 
     environment = [
-      { name = "NODE_ENV",              value = var.environment },
-      { name = "PORT",                  value = "3000" },
-      { name = "HOST",                  value = "0.0.0.0" },
-      { name = "DATABASE_SSL",          value = "true" },
-      { name = "AWS_REGION",            value = data.aws_region.current.name },
+      { name = "NODE_ENV", value = var.environment },
+      { name = "PORT", value = "3000" },
+      { name = "HOST", value = "0.0.0.0" },
+      { name = "DATABASE_SSL", value = "true" },
+      { name = "AWS_REGION", value = data.aws_region.current.name },
       { name = "JWT_ACCESS_EXPIRES_IN", value = "15m" },
-      { name = "JWT_REFRESH_EXPIRES_IN",value = "7d" },
-      { name = "RATE_LIMIT_MAX",        value = "100" },
-      { name = "RATE_LIMIT_WINDOW",     value = "60000" },
-      { name = "LOG_LEVEL",             value = "info" },
-      { name = "CORS_ORIGIN",           value = var.cors_origin }
+      { name = "JWT_REFRESH_EXPIRES_IN", value = "7d" },
+      { name = "RATE_LIMIT_MAX", value = "100" },
+      { name = "RATE_LIMIT_WINDOW", value = "60000" },
+      { name = "LOG_LEVEL", value = "info" },
+      { name = "CORS_ORIGIN", value = var.cors_origin },
+      { name = "MARKETPLACE_PRODUCT_CODE", value = var.marketplace_product_code },
+      { name = "MARKETPLACE_CAMERA_DIMENSION", value = var.marketplace_camera_dimension },
+      { name = "MARKETPLACE_ENTITLEMENT_REGION", value = var.marketplace_entitlement_region },
+      { name = "MARKETPLACE_REGISTRATION_PAGE_URL", value = var.marketplace_registration_page_url }
     ]
 
     secrets = [

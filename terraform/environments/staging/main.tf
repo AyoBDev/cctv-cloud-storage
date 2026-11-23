@@ -98,6 +98,12 @@ module "database" {
 module "compute" {
   source = "../../modules/compute"
 
+  # AWS Marketplace (values in marketplace.tf)
+  marketplace_product_code          = var.marketplace_product_code
+  marketplace_camera_dimension      = var.marketplace_camera_dimension
+  marketplace_entitlement_region    = var.marketplace_region
+  marketplace_registration_page_url = var.marketplace_registration_page_url
+
   project                     = local.project
   environment                 = local.environment
   vpc_id                      = module.networking.vpc_id
