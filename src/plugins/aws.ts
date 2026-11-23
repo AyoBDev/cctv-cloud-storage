@@ -9,10 +9,33 @@ import { SESClient } from '@aws-sdk/client-ses';
 import { SNSClient } from '@aws-sdk/client-sns';
 import { MarketplaceMeteringClient } from '@aws-sdk/client-marketplace-metering';
 import { MarketplaceEntitlementServiceClient } from '@aws-sdk/client-marketplace-entitlement-service';
+import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { env } from '@config/env';
 import { setRekognitionClient } from '@services/rekognition.service';
 import { setS3Client } from '@services/s3.service';
 import { setSesClient } from '@services/ses.service';
+
+const MARKETPLACE_ROLE_SESSION_NAME = 'olympusvisions-api-marketplace';
+
+/**
+ * Client settings for the AWS Marketplace APIs. These only work from the seller
+ * account that published the listing, so when `sellerRoleArn` is set the clients
+ * assume that role (credentials refresh automatically); otherwise they use the
+ * default credential chain like every other client.
+ */
+export function marketplaceClientConfig(
+  region: string,
+  sellerRoleArn: string,
+): { region: string; credentials?: ReturnType<typeof fromTemporaryCredentials> } {
+  if (!sellerRoleArn) return { region };
+  return {
+    region,
+    credentials: fromTemporaryCredentials({
+      params: { RoleArn: sellerRoleArn, RoleSessionName: MARKETPLACE_ROLE_SESSION_NAME },
+      clientConfig: { region },
+    }),
+  };
+}
 
 export default fp(async function awsPlugin(app: FastifyInstance) {
   const kvs = new KinesisVideoClient({ region: env.AWS_REGION });
@@ -22,10 +45,12 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   const s3 = new S3Client({ region: env.AWS_REGION });
   const ses = new SESClient({ region: env.SES_REGION });
   const sns = new SNSClient({ region: env.AWS_REGION });
-  const marketplaceMetering = new MarketplaceMeteringClient({ region: env.AWS_REGION });
-  const marketplaceEntitlement = new MarketplaceEntitlementServiceClient({
-    region: env.MARKETPLACE_ENTITLEMENT_REGION,
-  });
+  const marketplaceMetering = new MarketplaceMeteringClient(
+    marketplaceClientConfig(env.AWS_REGION, env.MARKETPLACE_SELLER_ROLE_ARN),
+  );
+  const marketplaceEntitlement = new MarketplaceEntitlementServiceClient(
+    marketplaceClientConfig(env.MARKETPLACE_ENTITLEMENT_REGION, env.MARKETPLACE_SELLER_ROLE_ARN),
+  );
 
   // Set clients on service modules
   setRekognitionClient(rekognition);
