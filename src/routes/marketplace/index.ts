@@ -16,7 +16,7 @@ import {
   signUpFromRegistration,
   type LinkedMarketplaceCustomer,
 } from '@services/marketplace-account.service';
-import { syncCustomerEntitlement } from '@services/entitlement.service';
+import { invalidateOrgAccess, syncCustomerEntitlement } from '@services/entitlement.service';
 
 /** Form fields AWS Marketplace posts to the fulfillment URL. */
 const TOKEN_FIELD = 'x-amzn-marketplace-token';
@@ -73,9 +73,13 @@ export default async function marketplaceRoutes(app: FastifyInstance): Promise<v
    * request: the customer stays pending and the next event or scheduled sync fixes it.
    */
   async function activateLinkedCustomer(linked: LinkedMarketplaceCustomer) {
+    // The org may have been a direct org until now; drop its cached access even if
+    // the AWS check below fails.
+    await invalidateOrgAccess(app.redis, linked.organizationId);
     try {
       const customer = await syncCustomerEntitlement(
         app.db,
+        app.redis,
         app.marketplaceEntitlement,
         linked.customerId,
         env.MARKETPLACE_CAMERA_DIMENSION,

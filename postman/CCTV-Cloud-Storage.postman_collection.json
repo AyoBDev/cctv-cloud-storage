@@ -1641,7 +1641,7 @@
                 "login"
               ]
             },
-            "description": "Authenticates an org user (org_admin or viewer) and returns an RS256 JWT access/refresh token pair.\n\n**No authentication required.**\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `email` | string | ✓ | Valid email format |\n| `password` | string | ✓ | Minimum 8 characters |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid email format or password < 8 chars |\n| 401 | `INVALID_CREDENTIALS` | Email not found or password incorrect |\n| 403 | `FORBIDDEN` | Account or organization is deactivated |"
+            "description": "Authenticates an org user (org_admin or viewer) and returns an RS256 JWT access/refresh token pair.\n\n**No authentication required.**\n\n### Request Body\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `email` | string | ✓ | Valid email format |\n| `password` | string | ✓ | Minimum 8 characters |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Invalid email format or password < 8 chars |\n| 401 | `INVALID_CREDENTIALS` | Email not found or password incorrect |\n| 403 | `FORBIDDEN` | Account or organization is deactivated |\n| 403 | `SUBSCRIPTION_INACTIVE` | The organization's AWS Marketplace subscription was cancelled |\n\nOrgs whose AWS Marketplace subscription is still `pending_activation` may log in; check `GET /api/v1/org/subscription`."
           },
           "response": [],
           "event": [
@@ -1704,7 +1704,7 @@
                 "refresh"
               ]
             },
-            "description": "Exchanges a valid refresh token for a new access/refresh token pair. The old refresh token is revoked (rotation).\n\n**No authentication required** — the refresh token is the credential.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}\n```"
+            "description": "Exchanges a valid refresh token for a new access/refresh token pair. The old refresh token is revoked (rotation).\n\n**No authentication required** — the refresh token is the credential.\n\n### Request Body\n| Field | Type | Required |\n|-------|------|----------|\n| `refreshToken` | string | ✓ |\n\n### Response `200 OK`\n```json\n{\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 401 | `TOKEN_INVALID` | Not a valid refresh token |\n| 401 | `TOKEN_REVOKED` | Token already used or logged out |\n| 401 | `UNAUTHORIZED` | User not found or deactivated |\n| 403 | `FORBIDDEN` | Organization is deactivated |\n| 403 | `SUBSCRIPTION_INACTIVE` | The organization's AWS Marketplace subscription was cancelled |"
           },
           "response": [],
           "event": [
@@ -2145,6 +2145,59 @@
       ]
     },
     {
+      "name": "Org / Subscription",
+      "description": "The organization's subscription and access state. Every other org route returns `403 SUBSCRIPTION_PENDING` or `403 SUBSCRIPTION_INACTIVE` for AWS Marketplace orgs that are not active, and `403 FORBIDDEN` for deactivated orgs.",
+      "item": [
+        {
+          "name": "Get Subscription",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/org/subscription",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "org",
+                "subscription"
+              ]
+            },
+            "description": "Returns how the signed-in user's organization is paid for and whether it currently has access. Allowed even while an AWS Marketplace subscription is pending or cancelled, so the website can explain why other requests are refused.\n\n**Requires org user JWT** (org_admin or viewer).\n\n### Response `200 OK`\n```json\n{\n  \"source\": \"aws_marketplace\",\n  \"status\": \"active\",\n  \"cameraLimit\": 10,\n  \"expiresAt\": \"2027-11-24T00:00:00.000Z\"\n}\n```\n| Field | Description |\n|-------|-------------|\n| `source` | `aws_marketplace` or `direct` (created by the Super Admin) |\n| `status` | `active`, `deactivated`, `pending_activation` (waiting for AWS) or `cancelled` |\n| `cameraLimit` | Most active cameras allowed; `null` means no limit (direct orgs) |\n| `expiresAt` | When the current AWS entitlement ends; `null` for direct orgs |\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 401 | `UNAUTHORIZED` | Missing or invalid token |\n| 403 | `FORBIDDEN` | Not an org user |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Has subscription fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.keys('source', 'status', 'cameraLimit', 'expiresAt');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "⚙️ Workflow — Full Auth Lifecycle",
       "description": "Run these requests **in order** to walk through the complete token lifecycle:\n\n1. **Login** → stores `accessToken` + `refreshToken`\n2. **Refresh Tokens** → rotates both tokens\n3. **Logout** → revokes the session\n4. **[Verify] Refresh after logout** → confirms `TOKEN_REVOKED`\n\nThis folder is intended for exploratory/manual testing and onboarding. Use the Runner to execute all four in sequence.",
       "item": [
@@ -2442,7 +2495,7 @@
                 "cameras"
               ]
             },
-            "description": "Create a new camera and provision a KVS stream + IoT Thing.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Camera name (1-255 chars) |\n| `slug` | string | No | URL-friendly identifier. Lowercase alphanumeric + hyphens (`[a-z0-9-]+`). Auto-generated as `cam1`, `cam2`, etc. if not provided. Must be unique within the org. |\n| `location` | string | No | Physical location |\n| `timezone` | string | No | IANA timezone (default: UTC) |\n| `rtsp_url` | string | No | RTSP stream URL (encrypted at rest via KMS) |\n\n### Response\nCamera status starts as `provisioning`. It transitions to `online` when the device starts streaming (via internal webhook).\n\nThe `kvs_stream_name` is built as `{orgSlug}-{cameraSlug}` (e.g. `acme-corp-front-door` or `acme-corp-cam1`)."
+            "description": "Create a new camera and provision a KVS stream + IoT Thing.\n\n**Auth:** `requireOrgAdmin`\n\n### Request Body\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Camera name (1-255 chars) |\n| `slug` | string | No | URL-friendly identifier. Lowercase alphanumeric + hyphens (`[a-z0-9-]+`). Auto-generated as `cam1`, `cam2`, etc. if not provided. Must be unique within the org. |\n| `location` | string | No | Physical location |\n| `timezone` | string | No | IANA timezone (default: UTC) |\n| `rtsp_url` | string | No | RTSP stream URL (encrypted at rest via KMS) |\n\n### Response\nCamera status starts as `provisioning`. It transitions to `online` when the device starts streaming (via internal webhook).\n\nThe `kvs_stream_name` is built as `{orgSlug}-{cameraSlug}` (e.g. `acme-corp-front-door` or `acme-corp-cam1`).\n\n### Camera limit\nOrganizations paid for through AWS Marketplace may have at most `cameraLimit` active cameras (see `GET /api/v1/org/subscription`). After a downgrade, existing cameras keep running; only new ones are refused.\n\n| Status | Code | Condition |\n|--------|------|-----------|\n| 403 | `CAMERA_LIMIT_REACHED` | The org already has `cameraLimit` active cameras |"
           },
           "event": [
             {
@@ -3500,6 +3553,112 @@
                   "pm.test('Response confirms update', () => {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body.message).to.equal('Status updated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "AWS Marketplace Event",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-secret",
+                "value": "{{internalApiSecret}}",
+                "description": "Shared secret for internal service auth"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/marketplace/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "marketplace",
+                "events"
+              ]
+            },
+            "description": "Receives one AWS Marketplace agreement/license event from EventBridge (forwarded unchanged by the queue Lambda).\n\n**Auth:** `x-internal-secret` header (shared secret, NOT JWT)\n\nEvery event is stored once in `marketplace_events` (the envelope `id` is the key, so redeliveries are no-ops). For entitlement-related detail types the API re-reads the buyer's entitlement from AWS `GetEntitlements`; it never takes state from the event body, so order and duplicates do not matter.\n\nActed on (both `- Manufacturer` and `- Proposer` variants): `Purchase Agreement Created`, `Purchase Agreement Amended`, `Purchase Agreement Ended`, `License Updated`, `License Deprovisioned`, `Purchase Agreement Free Trial Converted`. Other detail types are stored only.\n\n### Request Body\nThe raw EventBridge event. Validated fields:\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `id` | string | Yes | EventBridge event ID |\n| `detail-type` | string | Yes | Event name |\n| `source` | string | Yes | Must be `aws.agreement-marketplace` |\n| `detail.acceptor.accountId` | string | No | Buyer AWS account |\n| `detail.agreement.id` | string | No | Agreement ID |\n| `detail.license.arn` | string | No | License ARN (License events only; stored as-is) |\n\n### Response `200 OK`\n```json\n{ \"outcome\": \"synced\" }\n```\n`outcome` is one of `synced`, `ignored` (detail type not acted on), `no_customer` (no org linked to the buyer yet; signup syncs later), `already_processed` (redelivery).\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Not an AWS Marketplace agreement event |\n| 401 | `UNAUTHORIZED` | Missing or wrong internal secret |\n| 503 | `MARKETPLACE_SYNC_FAILED` | AWS call failed; the error is stored on the event and the queue should retry |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"0\",\n  \"id\": \"00000000-0000-4000-8000-000000000001\",\n  \"detail-type\": \"License Updated - Manufacturer\",\n  \"source\": \"aws.agreement-marketplace\",\n  \"account\": \"111122223333\",\n  \"time\": \"2026-11-24T12:00:00Z\",\n  \"region\": \"us-east-1\",\n  \"resources\": [\n    \"arn:aws:aws-marketplace:us-east-1:111122223333:AWSMarketplace/Agreement/agmt-example0000000000000\"\n  ],\n  \"detail\": {\n    \"requestId\": \"00000000-0000-4000-8000-000000000002\",\n    \"agreement\": {\n      \"id\": \"agmt-example0000000000000\",\n      \"intent\": \"NEW\",\n      \"status\": \"ACTIVE\"\n    },\n    \"product\": {\n      \"id\": \"prod-example0000000\",\n      \"title\": \"Example product\"\n    },\n    \"license\": {\n      \"arn\": \"aws:license-manager::111122223333:license:l-example000000000\"\n    },\n    \"acceptor\": {\n      \"accountId\": \"444455556666\"\n    },\n    \"proposer\": {\n      \"accountId\": \"111122223333\"\n    },\n    \"offer\": {\n      \"id\": \"offer-example00000000\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Has outcome', () => {",
+                  "    pm.expect(['synced', 'ignored', 'no_customer', 'already_processed']).to.include(pm.response.json().outcome);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Reconcile AWS Marketplace Customers",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-secret",
+                "value": "{{internalApiSecret}}",
+                "description": "Shared secret for internal service auth"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/marketplace/reconcile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "marketplace",
+                "reconcile"
+              ]
+            },
+            "description": "Re-syncs every AWS Marketplace customer with AWS `GetEntitlements`. Catches anything a lost or delayed event missed, and entitlements that expire. One customer failing does not stop the run; each changed customer is logged. Intended to run hourly.\n\n**Auth:** `x-internal-secret` header (shared secret, NOT JWT)\n\n### Response `200 OK`\n```json\n{ \"checked\": 12, \"changed\": 1, \"failed\": 0 }\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 401 | `UNAUTHORIZED` | Missing or wrong internal secret |"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Has counts', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.keys('checked', 'changed', 'failed');",
                   "});"
                 ]
               }

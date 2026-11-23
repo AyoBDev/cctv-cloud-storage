@@ -8,6 +8,7 @@ import {
   updateOrganization,
   deleteOrganization,
 } from '@services/organization.service';
+import { invalidateOrgAccess } from '@services/entitlement.service';
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -206,6 +207,8 @@ export default async function organizationRoutes(app: FastifyInstance): Promise<
       if (body.slug !== undefined) updates.slug = body.slug;
       if (body.is_active !== undefined) updates.is_active = body.is_active;
       const org = await updateOrganization(app.db, params.orgId, updates);
+      // Activating or deactivating an org must reach its users' next request.
+      await invalidateOrgAccess(app.redis, params.orgId);
       return reply.code(200).send(org);
     },
   );
@@ -229,6 +232,7 @@ export default async function organizationRoutes(app: FastifyInstance): Promise<
     async (request, reply) => {
       const params = orgIdParamsSchema.parse(request.params);
       await deleteOrganization(app.db, params.orgId);
+      await invalidateOrgAccess(app.redis, params.orgId);
       return reply.code(204).send();
     },
   );

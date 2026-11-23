@@ -141,6 +141,70 @@ components:
       example:
         organizationId: 00000000-0000-0000-0000-000000000000
         subscriptionStatus: active
+    OrgSubscription:
+      type: object
+      required: [source, status, cameraLimit, expiresAt]
+      properties:
+        source:
+          type: string
+          enum: [aws_marketplace, direct]
+          description: "`direct` means the org was created by the Super Admin"
+        status:
+          type: string
+          enum: [active, deactivated, pending_activation, cancelled]
+        cameraLimit:
+          type: integer
+          nullable: true
+          description: Most active cameras allowed; null means no limit
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the current AWS entitlement ends; null for direct orgs
+      example:
+        source: aws_marketplace
+        status: active
+        cameraLimit: 10
+        expiresAt: "2027-11-24T00:00:00.000Z"
+    MarketplaceEventBridgeEvent:
+      type: object
+      description: |
+        A raw EventBridge event for AWS Marketplace agreements and licenses. Only the
+        fields below are validated; the whole event is stored.
+      required: [id, detail-type, source, detail]
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          maxLength: 255
+        detail-type:
+          type: string
+          example: License Updated - Manufacturer
+        source:
+          type: string
+          enum: [aws.agreement-marketplace]
+        detail:
+          type: object
+          additionalProperties: true
+          properties:
+            agreement:
+              type: object
+              properties:
+                id:
+                  type: string
+            license:
+              type: object
+              description: License events only
+              properties:
+                arn:
+                  type: string
+                  description: Stored as-is; AWS examples are not always well-formed ARNs
+            acceptor:
+              type: object
+              properties:
+                accountId:
+                  type: string
+                  description: The buyer's AWS account
     Error:
       type: object
       required: [error]
@@ -162,6 +226,14 @@ components:
                 - NOT_FOUND
                 - CONFLICT
                 - RATE_LIMIT_EXCEEDED
+                - MARKETPLACE_REGISTRATION_NOT_FOUND
+                - MARKETPLACE_REGISTRATION_EXPIRED
+                - MARKETPLACE_ACCOUNT_ALREADY_LINKED
+                - ORG_ALREADY_LINKED
+                - MARKETPLACE_SYNC_FAILED
+                - SUBSCRIPTION_PENDING
+                - SUBSCRIPTION_INACTIVE
+                - CAMERA_LIMIT_REACHED
                 - INTERNAL_ERROR
             message:
               type: string
@@ -1314,7 +1386,10 @@ paths:
                   code: INVALID_CREDENTIALS
                   message: Invalid email or password
         "403":
-          description: Account or organization deactivated
+          description: |
+            Account or organization deactivated (`FORBIDDEN`), or the organization's AWS
+            Marketplace subscription was cancelled (`SUBSCRIPTION_INACTIVE`). Orgs whose
+            subscription is still pending may log in.
           content:
             application/json:
               schema:
@@ -1330,6 +1405,8 @@ paths:
       description: |
         Exchanges a valid refresh token for a new access/refresh token pair.
         The old refresh token is revoked (single-use rotation).
+        Refused when the organization is deactivated or its AWS Marketplace
+        subscription was cancelled.
       operationId: orgRefresh
       tags: [Auth]
       security: []
@@ -1354,6 +1431,12 @@ paths:
                 $ref: "#/components/schemas/TokenPair"
         "401":
           description: Invalid, expired, or revoked refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Organization deactivated (`FORBIDDEN`) or AWS Marketplace subscription cancelled (`SUBSCRIPTION_INACTIVE`)
           content:
             application/json:
               schema:
@@ -1445,6 +1528,41 @@ paths:
   # ─────────────────────────────────────────────────────────
   # Org Users (Org Admin)
   # ─────────────────────────────────────────────────────────
+  /api/v1/org/subscription:
+    get:
+      summary: Get the organization's subscription and access state
+      description: |
+        How the signed-in user's organization is paid for, and whether it currently has
+        access. Allowed even while an AWS Marketplace subscription is pending or
+        cancelled, so the website can explain why other requests return
+        `SUBSCRIPTION_PENDING` or `SUBSCRIPTION_INACTIVE`.
+
+        Every other org route checks this state on each request (cached for up to 60 s,
+        cleared immediately when AWS reports a change).
+      operationId: getOrgSubscription
+      tags: [Org Users]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Subscription state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgSubscription"
+        "401":
+          description: Missing or invalid access token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not an org user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/org/users:
     get:
       summary: List org users
@@ -1711,6 +1829,10 @@ paths:
         The `slug` field is optional — if omitted, auto-generates as `cam1`, `cam2`, etc.
         The KVS stream name is built as `{orgSlug}-{cameraSlug}` (e.g. `acme-front-door`).
         RTSP URL is encrypted at rest via KMS.
+
+        Organizations paid for through AWS Marketplace may have at most `cameraLimit`
+        active cameras (see `GET /api/v1/org/subscription`). After a downgrade, existing
+        cameras keep running; only new ones are refused with `CAMERA_LIMIT_REACHED`.
       operationId: createCamera
       tags: [Cameras]
       security:
@@ -1775,11 +1897,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
-          description: Forbidden — org admin required
+          description: |
+            Org admin required (`FORBIDDEN`), subscription not active
+            (`SUBSCRIPTION_PENDING` / `SUBSCRIPTION_INACTIVE`), or the AWS Marketplace
+            camera limit is reached (`CAMERA_LIMIT_REACHED`).
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: CAMERA_LIMIT_REACHED
+                  message: Your subscription allows 10 active cameras. Remove a camera or upgrade your subscription in AWS Marketplace.
         "409":
           description: Camera slug already taken in this organization
           content:
@@ -4780,3 +4909,137 @@ paths:
                   message: This organization is already linked to an AWS Marketplace subscription
         "410":
           $ref: "#/components/responses/MarketplaceRegistrationExpired"
+
+  /internal/marketplace/events:
+    post:
+      summary: Receive an AWS Marketplace EventBridge event
+      description: |
+        Called by the queue Lambda with one raw EventBridge event. Every event is stored
+        once in `marketplace_events` (the envelope `id` is the key, so redeliveries are
+        no-ops). For entitlement-related detail types, the buyer's entitlement is re-read
+        from AWS `GetEntitlements`; state is never taken from the event body, so order
+        and duplicates do not matter.
+
+        Acted on, in both `- Manufacturer` and `- Proposer` variants:
+        `Purchase Agreement Created`, `Purchase Agreement Amended`,
+        `Purchase Agreement Ended`, `License Updated`, `License Deprovisioned`,
+        `Purchase Agreement Free Trial Converted`. Other detail types are stored only.
+      operationId: receiveMarketplaceEvent
+      tags: [Internal]
+      security: []
+      parameters:
+        - name: x-internal-secret
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret for internal service auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketplaceEventBridgeEvent"
+            example:
+              version: "0"
+              id: 00000000-0000-4000-8000-000000000001
+              detail-type: License Updated - Manufacturer
+              source: aws.agreement-marketplace
+              account: "111122223333"
+              time: "2026-11-24T12:00:00Z"
+              region: us-east-1
+              resources:
+                - arn:aws:aws-marketplace:us-east-1:111122223333:AWSMarketplace/Agreement/agmt-example0000000000000
+              detail:
+                agreement:
+                  id: agmt-example0000000000000
+                product:
+                  id: prod-example0000000
+                license:
+                  arn: aws:license-manager::111122223333:license:l-example000000000
+                acceptor:
+                  accountId: "444455556666"
+                proposer:
+                  accountId: "111122223333"
+                offer:
+                  id: offer-example00000000
+      responses:
+        "200":
+          description: Event stored (and synced when applicable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outcome:
+                    type: string
+                    enum: [synced, ignored, no_customer, already_processed]
+                    description: |
+                      `ignored`: detail type not acted on. `no_customer`: no org linked
+                      to the buyer yet (signup syncs later). `already_processed`: redelivery.
+              example:
+                outcome: synced
+        "400":
+          description: Not an AWS Marketplace agreement event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or missing internal secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The AWS call failed; the error is stored on the event and the queue should retry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: MARKETPLACE_SYNC_FAILED
+                  message: Could not check the entitlement with AWS Marketplace; retry later
+
+  /internal/marketplace/reconcile:
+    post:
+      summary: Re-sync every AWS Marketplace customer
+      description: |
+        Re-reads every customer's entitlement from AWS. Catches anything a lost or
+        delayed event missed, and entitlements that expire. One failure does not stop
+        the run; each changed customer is logged. Intended to run hourly.
+      operationId: reconcileMarketplaceCustomers
+      tags: [Internal]
+      security: []
+      parameters:
+        - name: x-internal-secret
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret for internal service auth
+      responses:
+        "200":
+          description: Run finished
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checked:
+                    type: integer
+                  changed:
+                    type: integer
+                  failed:
+                    type: integer
+              example:
+                checked: 12
+                changed: 1
+                failed: 0
+        "401":
+          description: Invalid or missing internal secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
