@@ -10,6 +10,7 @@ import cameraRoutes from './cameras/index';
 import faceProfileRoutes from './face-profiles/index';
 import recognitionEventRoutes from './recognition-events/index';
 import chatRoutes from './chat/index';
+import marketplaceRoutes from './marketplace/index';
 
 export default async function apiRoutes(app: FastifyInstance): Promise<void> {
   // Admin auth routes: /api/v1/admin/auth/*
@@ -44,4 +45,7 @@ export default async function apiRoutes(app: FastifyInstance): Promise<void> {
 
   // Chat routes: /api/v1/chat/*
   await app.register(chatRoutes, { prefix: '/chat' });
+
+  // AWS Marketplace registration: /api/v1/marketplace/*
+  await app.register(marketplaceRoutes, { prefix: '/marketplace' });
 }

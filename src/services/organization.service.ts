@@ -1,6 +1,7 @@
 import type { Sql, TransactionSql } from 'postgres';
 import { hashPassword } from '@utils/password';
 import { AppError } from '@utils/errors';
+import { uniqueViolationConstraint } from '@utils/postgres-errors';
 
 export interface Organization {
   id: string;
@@ -47,40 +48,59 @@ export async function listOrganizations(
   return { data, pagination: { page, limit, total } };
 }
 
+export interface NewOrganizationWithAdmin {
+  name: string;
+  slug: string;
+  adminEmail: string;
+  adminPassword: string;
+}
+
+/**
+ * Inserts an organization and its first org_admin inside a caller-owned transaction,
+ * so other flows (e.g. AWS Marketplace signup) can add their own rows atomically.
+ */
+export async function insertOrganizationWithAdmin(
+  tx: TransactionSql,
+  params: NewOrganizationWithAdmin,
+): Promise<Organization> {
+  const sql = tx as unknown as Sql;
+  const orgRows = await sql<Organization[]>`
+    INSERT INTO organizations (name, slug)
+    VALUES (${params.name}, ${params.slug})
+    RETURNING id, name, slug, is_active, camera_seq, created_at, updated_at
+  `;
+
+  const org = orgRows[0];
+  if (!org) throw new Error('Failed to create organization');
+
+  const passwordHash = await hashPassword(params.adminPassword);
+
+  await sql`
+    INSERT INTO users (email, password_hash, role, org_id)
+    VALUES (${params.adminEmail}, ${passwordHash}, 'org_admin', ${org.id})
+  `;
+
+  return org;
+}
+
+/** Maps unique-constraint violations from org/admin creation to API errors. */
+export function toOrganizationConflictError(err: unknown): unknown {
+  const constraint = uniqueViolationConstraint(err);
+  if (constraint === null) return err;
+  if (constraint.includes('email')) return AppError.conflict('Email already registered');
+  if (constraint.includes('slug')) return AppError.conflict('Slug already taken');
+  return err;
+}
+
 export async function createOrganizationWithAdmin(
   db: Sql,
-  params: { name: string; slug: string; adminEmail: string; adminPassword: string },
+  params: NewOrganizationWithAdmin,
 ): Promise<Organization> {
   try {
-    const result = await db.begin(async (tx: TransactionSql) => {
-      const orgRows = await (tx as unknown as Sql)<Organization[]>`
-        INSERT INTO organizations (name, slug)
-        VALUES (${params.name}, ${params.slug})
-        RETURNING id, name, slug, is_active, camera_seq, created_at, updated_at
-      `;
-
-      const org = orgRows[0];
-      if (!org) throw new Error('Failed to create organization');
-
-      const passwordHash = await hashPassword(params.adminPassword);
-
-      await (tx as unknown as Sql)`
-        INSERT INTO users (email, password_hash, role, org_id)
-        VALUES (${params.adminEmail}, ${passwordHash}, 'org_admin', ${org.id})
-      `;
-
-      return org;
-    });
-
+    const result = await db.begin((tx: TransactionSql) => insertOrganizationWithAdmin(tx, params));
     return result as Organization;
   } catch (err) {
-    if (isPostgresError(err) && err.code === '23505') {
-      if (err.constraint?.includes('email')) {
-        throw AppError.conflict('Email already registered');
-      }
-      throw AppError.conflict('Slug already taken');
-    }
-    throw err;
+    throw toOrganizationConflictError(err);
   }
 }
 

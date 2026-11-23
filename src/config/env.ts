@@ -48,6 +48,17 @@ const envSchema = z.object({
   WEB_PUSH_VAPID_PUBLIC_KEY: z.string().default(''),
   WEB_PUSH_VAPID_PRIVATE_KEY: z.string().default(''),
   WEB_PUSH_CONTACT_EMAIL: z.string().default(''),
+
+  // AWS Marketplace (SaaS contract). ResolveCustomer runs in AWS_REGION;
+  // the Entitlement Service is called in MARKETPLACE_ENTITLEMENT_REGION.
+  MARKETPLACE_PRODUCT_CODE: z.string().default(''),
+  MARKETPLACE_CAMERA_DIMENSION: z.string().default('cameras'),
+  MARKETPLACE_ENTITLEMENT_REGION: z.string().default('us-east-1'),
+  MARKETPLACE_REGISTRATION_PAGE_URL: z
+    .string()
+    .url()
+    .default('https://www.olympusvisions.com/marketplace/register'),
+  MARKETPLACE_REGISTRATION_TTL_MINUTES: z.coerce.number().int().positive().default(60),
 });
 
 function parseEnv() {

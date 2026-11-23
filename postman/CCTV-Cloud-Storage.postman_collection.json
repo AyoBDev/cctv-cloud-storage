@@ -76,6 +76,12 @@
       "value": "",
       "type": "string",
       "description": "KVS stream name for the camera. Set automatically by Download Camera Credentials request."
+    },
+    {
+      "key": "marketplaceReference",
+      "value": "",
+      "type": "string",
+      "description": "The ?ref= value from the AWS Marketplace redirect to the website."
     }
   ],
   "auth": {
@@ -3286,6 +3292,155 @@
               }
             }
           ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "AWS Marketplace",
+      "description": "AWS Marketplace SaaS contract registration. AWS posts the buyer to **Register (fulfillment URL)**, which redirects to the website with `?ref=`. Copy that value into the `marketplaceReference` variable to try the other requests. Locally, Register needs real AWS credentials and a real token; use the Jest tests for mocked runs.",
+      "item": [
+        {
+          "name": "Register (fulfillment URL)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "x-amzn-marketplace-token",
+                  "value": "<token from AWS Marketplace>",
+                  "type": "text"
+                },
+                {
+                  "key": "x-amzn-marketplace-offer-type",
+                  "value": "free-trial",
+                  "type": "text",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplace/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "marketplace",
+                "register"
+              ]
+            },
+            "description": "Fulfillment URL for the AWS Marketplace listing. Resolves the token with `ResolveCustomer` and responds **303** to the website:\n\n- success: `...?ref=<one-time reference>` (valid 1 hour)\n- failure: `...?error=token_expired | token_invalid | wrong_product | unavailable`\n\n**No authentication required.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Registration",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplace/registrations/{{marketplaceReference}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "marketplace",
+                "registrations",
+                "{{marketplaceReference}}"
+              ]
+            },
+            "description": "Called by the website with the `ref` from the redirect.\n\n### Response `200 OK`\n```json\n{ \"isFreeTrial\": false, \"expiresAt\": \"2026-11-24T10:00:00.000Z\", \"awsAccountAlreadyLinked\": false }\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Malformed reference |\n| 404 | `MARKETPLACE_REGISTRATION_NOT_FOUND` | Unknown or already-used reference |\n| 410 | `MARKETPLACE_REGISTRATION_EXPIRED` | Reference older than 1 hour |"
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Up (new customer)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationName\": \"Example Security Ltd\",\n  \"adminEmail\": \"jane.doe@example.com\",\n  \"adminPassword\": \"SecurePass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplace/registrations/{{marketplaceReference}}/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "marketplace",
+                "registrations",
+                "{{marketplaceReference}}",
+                "signup"
+              ]
+            },
+            "description": "Creates the organization and Org Admin and links the AWS account. Consumes the reference.\n\n### Response `201 Created`\n```json\n{ \"organizationId\": \"uuid\", \"subscriptionStatus\": \"active\" }\n```\n`subscriptionStatus` is `pending_activation` until AWS confirms the contract.\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Malformed reference |\n| 404 | `MARKETPLACE_REGISTRATION_NOT_FOUND` | Unknown or already-used reference |\n| 410 | `MARKETPLACE_REGISTRATION_EXPIRED` | Reference older than 1 hour |\n| 409 | `CONFLICT` | Email already registered |\n| 409 | `MARKETPLACE_ACCOUNT_ALREADY_LINKED` | AWS account already linked to an org |"
+          },
+          "response": []
+        },
+        {
+          "name": "Link to My Organization (Org Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/marketplace/registrations/{{marketplaceReference}}/link",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "marketplace",
+                "registrations",
+                "{{marketplaceReference}}",
+                "link"
+              ]
+            },
+            "description": "Links the AWS purchase to the signed-in Org Admin's organization. Consumes the reference.\n\n**Requires org_admin JWT.**\n\n### Response `200 OK`\n```json\n{ \"organizationId\": \"uuid\", \"subscriptionStatus\": \"active\" }\n```\n\n### Error Responses\n| Status | Code | Condition |\n|--------|------|-----------|\n| 400 | `VALIDATION_ERROR` | Malformed reference |\n| 404 | `MARKETPLACE_REGISTRATION_NOT_FOUND` | Unknown or already-used reference |\n| 410 | `MARKETPLACE_REGISTRATION_EXPIRED` | Reference older than 1 hour |\n| 401 | `UNAUTHORIZED` | Missing or invalid token |\n| 403 | `FORBIDDEN` | Not an Org Admin |\n| 409 | `MARKETPLACE_ACCOUNT_ALREADY_LINKED` | AWS account linked to another org |\n| 409 | `ORG_ALREADY_LINKED` | Org already linked to an AWS account |"
+          },
           "response": []
         }
       ]

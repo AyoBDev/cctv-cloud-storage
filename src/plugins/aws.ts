@@ -7,6 +7,8 @@ import { RekognitionClient } from '@aws-sdk/client-rekognition';
 import { S3Client } from '@aws-sdk/client-s3';
 import { SESClient } from '@aws-sdk/client-ses';
 import { SNSClient } from '@aws-sdk/client-sns';
+import { MarketplaceMeteringClient } from '@aws-sdk/client-marketplace-metering';
+import { MarketplaceEntitlementServiceClient } from '@aws-sdk/client-marketplace-entitlement-service';
 import { env } from '@config/env';
 import { setRekognitionClient } from '@services/rekognition.service';
 import { setS3Client } from '@services/s3.service';
@@ -20,6 +22,10 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   const s3 = new S3Client({ region: env.AWS_REGION });
   const ses = new SESClient({ region: env.SES_REGION });
   const sns = new SNSClient({ region: env.AWS_REGION });
+  const marketplaceMetering = new MarketplaceMeteringClient({ region: env.AWS_REGION });
+  const marketplaceEntitlement = new MarketplaceEntitlementServiceClient({
+    region: env.MARKETPLACE_ENTITLEMENT_REGION,
+  });
 
   // Set clients on service modules
   setRekognitionClient(rekognition);
@@ -33,6 +39,8 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   app.decorate('s3', s3);
   app.decorate('ses', ses);
   app.decorate('sns', sns);
+  app.decorate('marketplaceMetering', marketplaceMetering);
+  app.decorate('marketplaceEntitlement', marketplaceEntitlement);
 
   app.addHook('onClose', async () => {
     kvs.destroy();
@@ -42,5 +50,7 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
     s3.destroy();
     ses.destroy();
     sns.destroy();
+    marketplaceMetering.destroy();
+    marketplaceEntitlement.destroy();
   });
 });

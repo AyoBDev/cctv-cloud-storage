@@ -8,6 +8,8 @@ import type { RekognitionClient } from '@aws-sdk/client-rekognition';
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { SESClient } from '@aws-sdk/client-ses';
 import type { SNSClient } from '@aws-sdk/client-sns';
+import type { MarketplaceMeteringClient } from '@aws-sdk/client-marketplace-metering';
+import type { MarketplaceEntitlementServiceClient } from '@aws-sdk/client-marketplace-entitlement-service';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -20,5 +22,7 @@ declare module 'fastify' {
     s3: S3Client;
     ses: SESClient;
     sns: SNSClient;
+    marketplaceMetering: MarketplaceMeteringClient;
+    marketplaceEntitlement: MarketplaceEntitlementServiceClient;
   }
 }

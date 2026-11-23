@@ -53,6 +53,7 @@ jobs:
       RATE_LIMIT_WINDOW: 60000
       LOG_LEVEL: error
       INTERNAL_API_SECRET: ci-test-secret-minimum-16-chars
+      MARKETPLACE_PRODUCT_CODE: test-product-code
       AWS_REGION: us-east-1
       SEED_ADMIN_EMAIL: admin@cctv-cloud.local
       SEED_ADMIN_PASSWORD: changeme123!
