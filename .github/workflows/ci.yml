@@ -109,3 +109,43 @@ jobs:
         with:
           name: coverage
           path: coverage/
+
+  lambda:
+    name: Lambda (${{ matrix.function }})
+    runs-on: ubuntu-latest
+
+    # Each Lambda has its own package.json and lockfile, so test them separately.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # node-version matches each function's Lambda runtime in terraform/modules
+          - function: face-recognition
+            node-version: '20'
+          - function: recording-archiver
+            node-version: '20'
+          - function: marketplace-events
+            node-version: '22'
+
+    defaults:
+      run:
+        working-directory: lambda/${{ matrix.function }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: lambda/${{ matrix.function }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
