@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and fill in with the values from the app team.
+# The account ID below is the AWS documentation placeholder, not a real account.
+app_task_role_arn = "arn:aws:iam::111122223333:role/cctv-staging-ecs-task-role"
+app_event_bus_arn = "arn:aws:events:us-east-1:111122223333:event-bus/default"

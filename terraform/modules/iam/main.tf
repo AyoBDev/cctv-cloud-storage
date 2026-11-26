@@ -164,6 +164,18 @@ resource "aws_iam_role_policy" "ecs_task_app" {
           "iot:DescribeEndpoint"
         ]
         Resource = "*"
+      },
+      # AWS Marketplace — the API resolves the registration token to a
+      # customer and reads entitlements (camera count) directly from AWS,
+      # which is the source of truth. These actions do not support
+      # resource-level permissions.
+      {
+        Effect = "Allow"
+        Action = [
+          "aws-marketplace:ResolveCustomer",
+          "aws-marketplace:GetEntitlements"
+        ]
+        Resource = "*"
       }
     ]
   })
