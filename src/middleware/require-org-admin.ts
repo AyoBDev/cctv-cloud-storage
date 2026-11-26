@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { AppError } from '@utils/errors';
+import { rejectIfOrgAccessDenied } from '@middleware/org-access';
 
 export async function requireOrgAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
@@ -27,4 +28,6 @@ export async function requireOrgAdmin(request: FastifyRequest, reply: FastifyRep
     await reply.code(403).send({ error: { code: err.code, message: err.message } });
     return;
   }
+
+  await rejectIfOrgAccessDenied(request, reply);
 }

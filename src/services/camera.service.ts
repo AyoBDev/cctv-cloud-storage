@@ -13,9 +13,10 @@ import {
   GetHLSStreamingSessionURLCommand,
 } from '@aws-sdk/client-kinesis-video-archived-media';
 import { encryptRtspUrl, decryptRtspUrl } from '@utils/kms';
-import { AppError } from '@utils/errors';
+import { AppError, ErrorCodes } from '@utils/errors';
 import { env } from '@config/env';
 import { createIoTThing, deleteIoTThing } from '@services/iot.service';
+import { getOrgAccess } from '@services/entitlement.service';
 
 interface PostgresError {
   code?: string;
@@ -103,6 +104,78 @@ function toCameraResponse(camera: Camera): CameraResponse {
   };
 }
 
+/**
+ * Locks the org row for the rest of the transaction so two concurrent camera
+ * creations cannot both pass the limit check. Returns the org slug.
+ */
+async function lockOrganizationForCameraChange(db: Sql, orgId: string): Promise<string> {
+  const rows = await db<[{ slug: string }]>`
+    SELECT slug FROM organizations WHERE id = ${orgId} FOR UPDATE
+  `;
+  const org = rows[0];
+  if (!org) throw new Error('Organization not found');
+  return org.slug;
+}
+
+/**
+ * Refuses a new active camera when the org is already at its AWS Marketplace
+ * limit. After a downgrade, cameras already over the limit keep running; only
+ * new ones are refused. A null limit means unlimited.
+ */
+async function assertCameraLimitAllowsAnother(
+  db: Sql,
+  orgId: string,
+  cameraLimit: number | null,
+): Promise<void> {
+  if (cameraLimit === null) return;
+
+  const rows = await db<[{ count: string }]>`
+    SELECT COUNT(*) FROM cameras WHERE org_id = ${orgId} AND is_active = true
+  `;
+  const activeCameras = parseInt(rows[0]?.count ?? '0', 10);
+  if (activeCameras >= cameraLimit) {
+    throw new AppError(
+      ErrorCodes.CAMERA_LIMIT_REACHED,
+      `Your subscription allows ${cameraLimit} active cameras. Remove a camera or upgrade your subscription in AWS Marketplace.`,
+      403,
+    );
+  }
+}
+
+/** Auto-generated slugs are cam1, cam2, ... from the org's camera_seq counter. */
+async function nextAutoCameraSlug(db: Sql, orgId: string): Promise<string> {
+  const rows = await db<[{ camera_seq: number }]>`
+    UPDATE organizations
+    SET camera_seq = camera_seq + 1
+    WHERE id = ${orgId}
+    RETURNING camera_seq
+  `;
+  const seq = rows[0];
+  if (!seq) throw new Error('Failed to increment camera_seq');
+  return `cam${seq.camera_seq}`;
+}
+
+async function insertCameraRow(
+  db: Sql,
+  orgId: string,
+  cameraSlug: string,
+  streamName: string,
+  data: { name: string; location?: string; timezone?: string },
+): Promise<Camera[]> {
+  return db<Camera[]>`
+    INSERT INTO cameras (org_id, name, slug, location, timezone, kvs_stream_name)
+    VALUES (
+      ${orgId},
+      ${data.name},
+      ${cameraSlug},
+      ${data.location ?? null},
+      ${data.timezone ?? 'UTC'},
+      ${streamName}
+    )
+    RETURNING *
+  `;
+}
+
 export async function createCamera(
   db: Sql,
   redis: Redis,
@@ -112,48 +185,18 @@ export async function createCamera(
   orgId: string,
   data: { name: string; slug?: string; location?: string; timezone?: string; rtsp_url?: string },
 ): Promise<CameraResponse> {
-  // Look up the org slug
-  const orgRows = await db<[{ slug: string; camera_seq: number }]>`
-    SELECT slug, camera_seq FROM organizations WHERE id = ${orgId}
-  `;
-  const org = orgRows[0];
-  if (!org) throw new Error('Organization not found');
+  // The limit comes from AWS Marketplace; direct orgs have none (null).
+  const { cameraLimit } = await getOrgAccess(db, redis, orgId);
 
-  let cameraSlug: string;
-
-  if (data.slug) {
-    // User-provided slug
-    cameraSlug = data.slug;
-  } else {
-    // Auto-generate: increment camera_seq and use cam{n}
-    const seqRows = await db<[{ camera_seq: number }]>`
-      UPDATE organizations
-      SET camera_seq = camera_seq + 1
-      WHERE id = ${orgId}
-      RETURNING camera_seq
-    `;
-    const seq = seqRows[0];
-    if (!seq) throw new Error('Failed to increment camera_seq');
-    cameraSlug = `cam${seq.camera_seq}`;
-  }
-
-  const streamName = `${org.slug}-${cameraSlug}`;
-
-  // Insert camera with slug and stream name
   let rows: Camera[];
   try {
-    rows = await db<Camera[]>`
-      INSERT INTO cameras (org_id, name, slug, location, timezone, kvs_stream_name)
-      VALUES (
-        ${orgId},
-        ${data.name},
-        ${cameraSlug},
-        ${data.location ?? null},
-        ${data.timezone ?? 'UTC'},
-        ${streamName}
-      )
-      RETURNING *
-    `;
+    rows = (await db.begin(async (tx: TransactionSql) => {
+      const txSql = tx as unknown as Sql;
+      const orgSlug = await lockOrganizationForCameraChange(txSql, orgId);
+      await assertCameraLimitAllowsAnother(txSql, orgId, cameraLimit);
+      const cameraSlug = data.slug ?? (await nextAutoCameraSlug(txSql, orgId));
+      return insertCameraRow(txSql, orgId, cameraSlug, `${orgSlug}-${cameraSlug}`, data);
+    })) as Camera[];
   } catch (err) {
     if (isPostgresError(err) && err.code === '23505') {
       throw AppError.conflict('Camera slug already taken in this organization');
@@ -163,6 +206,7 @@ export async function createCamera(
 
   const camera = rows[0];
   if (!camera) throw new Error('Insert returned no rows');
+  const streamName = camera.kvs_stream_name;
 
   let streamArn: string | null = null;
   let iotThingName: string | null = null;
