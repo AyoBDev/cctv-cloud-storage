@@ -5,6 +5,7 @@ import { hashPassword } from '@utils/password';
 import { signAccessToken, signRefreshToken, verifyToken } from '@utils/jwt';
 import type { RefreshTokenPayload } from '@utils/jwt';
 import { AppError, ErrorCodes } from '@utils/errors';
+import { getOrgAccess, signInDenial } from '@services/entitlement.service';
 
 interface User {
   id: string;
@@ -25,6 +26,15 @@ const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
 
 function refreshTokenRedisKey(jti: string): string {
   return `refresh:${jti}`;
+}
+
+/**
+ * Refuses sign-in for users of a deactivated org or a cancelled AWS Marketplace
+ * subscription. Pending subscriptions may sign in (see `signInDenial`).
+ */
+async function assertOrgAllowsSignIn(db: Sql, redis: Redis, orgId: string): Promise<void> {
+  const denial = signInDenial(await getOrgAccess(db, redis, orgId));
+  if (denial) throw denial;
 }
 
 export async function loginSuperAdmin(
@@ -88,6 +98,9 @@ export async function loginOrgUser(
     throw AppError.invalidCredentials();
   }
 
+  // After the password check, so subscription state is only revealed to the account owner.
+  await assertOrgAllowsSignIn(db, redis, user.org_id as string);
+
   return issueTokenPair(redis, user);
 }
 
@@ -147,6 +160,11 @@ export async function refreshTokens(db: Sql, redis: Redis, token: string): Promi
   const user = rows[0];
   if (!user || !user.is_active) {
     throw AppError.unauthorized('User not found or inactive');
+  }
+
+  // Org users must not keep refreshing after their org is deactivated or cancelled.
+  if (user.org_id) {
+    await assertOrgAllowsSignIn(db, redis, user.org_id);
   }
 
   return issueTokenPair(redis, user);
