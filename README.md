@@ -113,7 +113,7 @@ JWT_ACCESS_EXPIRES=15m
 JWT_REFRESH_EXPIRES=7d
 
 # AWS
-AWS_REGION=eu-west-2
+AWS_REGION=eu-west-1
 AWS_ACCESS_KEY_ID=your-key        # Only for local dev; use IAM roles in production
 AWS_SECRET_ACCESS_KEY=your-secret
 

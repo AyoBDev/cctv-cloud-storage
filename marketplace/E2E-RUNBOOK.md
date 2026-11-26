@@ -25,7 +25,7 @@ Tick every box before you start. Most failures come from a skipped prerequisite.
 
 - [ ] **PRs merged and deployed to staging:** PR 1 (registration, signup, link),
       PR 2 (events, reconcile, access checks, camera limit) and PR 3 (Lambda + Terraform).
-      Migrations `013_marketplace` and `014_marketplace_events` have run.
+      Migrations `014_marketplace` and `015_marketplace_events` have run.
 - [ ] **Listing values received from the CTO:** seller account ID, product code,
       camera dimension API name, access role ARN, whether there is a free trial,
       and the test buyer account ID.

@@ -111,7 +111,7 @@ curl -o ~/certs/root-ca.pem $(jq -r '.root_ca_url' credentials.json)
 ### Set Environment Variables
 
 ```bash
-export AWS_DEFAULT_REGION=eu-west-2
+export AWS_DEFAULT_REGION=eu-west-1
 export CERT_PATH=$HOME/certs/device.crt
 export PRIVATE_KEY_PATH=$HOME/certs/private.key
 export CA_CERT_PATH=$HOME/certs/root-ca.pem
@@ -160,7 +160,7 @@ Create a script `~/start-cameras.sh`:
 
 # Camera 1
 (
-  export AWS_DEFAULT_REGION=eu-west-2
+  export AWS_DEFAULT_REGION=eu-west-1
   export CERT_PATH=$HOME/certs/camera1/device.crt
   export PRIVATE_KEY_PATH=$HOME/certs/camera1/private.key
   export CA_CERT_PATH=$HOME/certs/camera1/root-ca.pem
@@ -172,7 +172,7 @@ Create a script `~/start-cameras.sh`:
 
 # Camera 2
 (
-  export AWS_DEFAULT_REGION=eu-west-2
+  export AWS_DEFAULT_REGION=eu-west-1
   export CERT_PATH=$HOME/certs/camera2/device.crt
   export PRIVATE_KEY_PATH=$HOME/certs/camera2/private.key
   export CA_CERT_PATH=$HOME/certs/camera2/root-ca.pem
@@ -214,6 +214,29 @@ chmod +x ~/start-cameras.sh
 - Check the Monitoring tab for PutMedia activity — if present, the stream works
 - Try Chrome (best codec support for KVS HLS)
 
+### Camera stuck on `provisioning` (no live view, no recording)
+Live view and recording both require the camera's status to be `online`. Once
+the producer is streaming to KVS, the **camera status reconciler** (a Lambda on
+a 1-minute schedule) detects recent fragments via `ListFragments` and promotes
+the camera to `online` automatically — no manual step is needed. Allow ~1–2
+minutes after the stream starts.
+
+If the camera is still `provisioning` after a couple of minutes:
+- Confirm PutMedia activity in the KVS Monitoring tab (the reconciler only sees
+  cameras that are actually pushing fragments).
+- Check the reconciler Lambda logs: CloudWatch group
+  `/aws/lambda/cctv-staging-camera-status-reconciler`.
+- Verify the reconciler's `INTERNAL_API_URL` is the HTTPS domain
+  (`https://api.olympusvisions.com`), not `http://<alb-dns>` — an HTTP ALB URL
+  301-redirects and the reconcile POST body is dropped across the redirect.
+- As a one-time manual override you can POST to `/internal/cameras/status`
+  (see the internal API), but the reconciler makes this unnecessary in normal
+  operation.
+
+A camera is demoted back to `offline` only after it stops sending fragments for
+longer than the grace window (`RECONCILE_GRACE_SECONDS`, default 600s), so brief
+network blips do not flap the status.
+
 ### Authentication errors
 - Ensure certificate file paths are absolute (not relative)
 - Verify the credential endpoint is correct for your region
@@ -223,7 +246,7 @@ chmod +x ~/start-cameras.sh
 - This is usually IPv6 on the Pi interfering. See the "Disable IPv6" section above.
 - Test manually:
   ```bash
-  curl -v https://<endpoint>.credentials.iot.eu-west-2.amazonaws.com/role-aliases/<alias>/credentials \
+  curl -v https://<endpoint>.credentials.iot.eu-west-1.amazonaws.com/role-aliases/<alias>/credentials \
     --cert ~/certs/device.crt \
     --key ~/certs/private.key \
     --cacert ~/certs/root-ca.pem

@@ -23,7 +23,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-2
+          aws-region: eu-west-1
 
       - name: Login to Amazon ECR
         id: ecr-login
@@ -32,7 +32,7 @@ jobs:
       - name: Build, tag, and push Docker image
         id: build
         env:
-          ECR_REGISTRY: 774305598371.dkr.ecr.eu-west-2.amazonaws.com
+          ECR_REGISTRY: 297315790712.dkr.ecr.eu-west-1.amazonaws.com
           ECR_REPOSITORY: cctv-staging-api
           IMAGE_TAG: production-${{ github.sha }}
         run: |

@@ -24,7 +24,7 @@ export async function createIoTThing(
   thingTypeName: string,
 ): Promise<string> {
   if (isTestEnv()) {
-    return `arn:aws:iot:eu-west-2:000000000000:thing/${thingName}`;
+    return `arn:aws:iot:eu-west-1:000000000000:thing/${thingName}`;
   }
 
   const result = await iot.send(new CreateThingCommand({ thingName, thingTypeName }));
@@ -99,7 +99,7 @@ export async function issueCredentials(
   if (isTestEnv()) {
     return {
       certificateId: 'test-cert-id',
-      certificateArn: `arn:aws:iot:eu-west-2:000000000000:cert/test-cert-id`,
+      certificateArn: `arn:aws:iot:eu-west-1:000000000000:cert/test-cert-id`,
       certificatePem: '-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----',
       privateKey: '-----BEGIN RSA PRIVATE KEY-----\nTEST\n-----END RSA PRIVATE KEY-----',
     };
@@ -148,7 +148,7 @@ export async function issueCredentials(
 
 export async function getCredentialEndpoint(iot: IoTClient): Promise<string> {
   if (isTestEnv()) {
-    return 'test-endpoint.credentials.iot.eu-west-2.amazonaws.com';
+    return 'test-endpoint.credentials.iot.eu-west-1.amazonaws.com';
   }
 
   if (cachedEndpoint) return cachedEndpoint;

@@ -27,6 +27,14 @@ describe('Recognition Events - Cross-Org Isolation', () => {
     });
     const cameraId = camRes.json<{ id: string }>().id;
 
+    // Enable face detection on the camera
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/cameras/${cameraId}/settings`,
+      headers: { authorization: `Bearer ${orgAToken}` },
+      payload: { face_detection_enabled: true },
+    });
+
     // Create a recognition event in Org A via internal endpoint
     const internalSecret = process.env['INTERNAL_API_SECRET'] ?? 'test-internal-secret-1234567890';
     const eventRes = await app.inject({

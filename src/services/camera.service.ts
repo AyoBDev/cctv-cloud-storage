@@ -495,6 +495,107 @@ export async function updateCameraStatus(
   await invalidateOrgCameraCache(redis, camera.org_id);
 }
 
+/**
+ * Returns the stream names of all cameras eligible for status reconciliation:
+ * active cameras that are not permanently deactivated. Used by the reconciler
+ * to decide which KVS streams to probe for recent media.
+ */
+export async function getReconcilableCameras(db: Sql): Promise<{ kvs_stream_name: string }[]> {
+  return db<{ kvs_stream_name: string }[]>`
+    SELECT kvs_stream_name FROM cameras
+    WHERE is_active = true AND status <> 'inactive'
+  `;
+}
+
+export interface ReconcileUpdate {
+  kvs_stream_name: string;
+  has_media: boolean;
+}
+
+export interface ReconcileResult {
+  kvs_stream_name: string;
+  status: string;
+  changed: boolean;
+}
+
+/**
+ * Reconciles camera statuses against observed KVS media, applying a grace
+ * window so a single missed cycle does not flap a camera offline.
+ *
+ * Policy per update:
+ *  - has_media=true  → refresh last_seen_at; promote to 'online' if not already.
+ *  - has_media=false → demote 'online' → 'offline' ONLY when last_seen_at is
+ *    older than graceSeconds. 'provisioning' and 'offline' are never demoted.
+ *  - unknown stream name → skipped silently (absent from the result).
+ *
+ * All writes happen in one transaction. Org camera caches are invalidated once
+ * per affected org after the row loop.
+ */
+export async function reconcileCameraStatuses(
+  db: Sql,
+  redis: Redis,
+  updates: ReconcileUpdate[],
+  graceSeconds: number,
+): Promise<ReconcileResult[]> {
+  return db.begin(async (txRaw: TransactionSql) => {
+    const tx = txRaw as unknown as Sql;
+    const results: ReconcileResult[] = [];
+    const changedOrgIds = new Set<string>();
+
+    for (const u of updates) {
+      const rows = await tx<{ id: string; org_id: string; status: string }[]>`
+        SELECT id, org_id, status FROM cameras
+        WHERE kvs_stream_name = ${u.kvs_stream_name} AND is_active = true
+      `;
+      const cam = rows[0];
+      if (!cam) continue;
+
+      let newStatus = cam.status;
+      let changed = false;
+
+      if (u.has_media) {
+        await tx`UPDATE cameras SET last_seen_at = now() WHERE id = ${cam.id}`;
+        if (cam.status !== 'online') {
+          newStatus = 'online';
+          changed = true;
+        }
+      } else if (cam.status === 'online') {
+        const stale = await tx<{ stale: boolean }[]>`
+          SELECT (
+            last_seen_at IS NOT NULL
+            AND now() - last_seen_at > ${graceSeconds} * interval '1 second'
+          ) AS stale
+          FROM cameras WHERE id = ${cam.id}
+        `;
+        if (stale[0]?.stale) {
+          newStatus = 'offline';
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        await tx`
+          UPDATE cameras SET status = ${newStatus}::camera_status
+          WHERE id = ${cam.id}
+        `;
+        changedOrgIds.add(cam.org_id);
+      }
+
+      results.push({
+        kvs_stream_name: u.kvs_stream_name,
+        status: newStatus,
+        changed,
+      });
+    }
+
+    for (const orgId of changedOrgIds) {
+      await invalidateOrgCameraCache(redis, orgId);
+    }
+
+    return results;
+  });
+}
+
 export async function listAllCameras(
   db: Sql,
   page: number,
