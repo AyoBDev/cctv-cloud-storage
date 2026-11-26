@@ -13,7 +13,7 @@ Placeholders used below. Replace them with real values in your own shell, never 
 | `111122223333` | Test **buyer** AWS account ID |
 | `444455556666` | **Seller** AWS account ID (owns the listing) |
 | `777788889999` | **App** AWS account ID (ECS, Lambda, SQS) |
-| `prod-example123` | Listing product code |
+| `abc123exampleproductcode` | Listing product code (a random-looking string, not the `prod-...` product ID) |
 | `cameras` | Camera dimension API name |
 | `jane.doe@example.com` | Org Admin email used for the test org |
 
@@ -27,8 +27,8 @@ Tick every box before you start. Most failures come from a skipped prerequisite.
       PR 2 (events, reconcile, access checks, camera limit) and PR 3 (Lambda + Terraform).
       Migrations `013_marketplace` and `014_marketplace_events` have run.
 - [ ] **Listing values received from the CTO:** seller account ID, product code,
-      product ID, camera dimension API name, access role ARN, whether there is a free
-      trial, and the test buyer account ID.
+      camera dimension API name, access role ARN, whether there is a free trial,
+      and the test buyer account ID.
 - [ ] **Terraform applied in this order** (see `terraform/seller/README.md`):
   1. App staging stack (`terraform/environments/staging`) with empty seller values.
      This creates the task role and event buses.
