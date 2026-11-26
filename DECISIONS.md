@@ -53,3 +53,21 @@ contract. Plan: `docs/plans/aws-marketplace-integration.md`.
 that follows our existing patterns (Fastify routes, PostgreSQL, Redis,
 Lambda → `/internal/*`, Terraform). Every event and scheduled check re-reads
 `GetEntitlements`, so event ordering and duplicates do not matter.
+
+## 2026-11-24 — AWS Marketplace end-to-end check script (PR 4/4)
+
+**Context:** A read-only CLI that each step of `marketplace/E2E-RUNBOOK.md` uses to
+confirm the org's subscription status and camera limit on staging.
+
+**Options considered:**
+- **API test runners** (Newman with the existing Postman collection, Hurl): good
+  for request/response checks, but awkward for "login refused means cancelled",
+  combining several calls into one verdict, and gating the one write call
+  (reconcile) behind a flag.
+- **Node built-ins** (`node:util` `parseArgs`, global `fetch`) run with the `tsx`
+  already in devDependencies: no new dependencies, and the logic is plain
+  TypeScript that the repo's Jest setup can unit test.
+
+**Decision:** Built-ins. The script and its helpers are under 500 lines with no new packages. The
+argument parsing and pass/fail logic are pure functions, unit tested in
+`tests/scripts/`.
