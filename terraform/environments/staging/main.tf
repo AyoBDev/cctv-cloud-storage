@@ -106,6 +106,8 @@ module "compute" {
   # AWS Marketplace (values in marketplace.tf)
   marketplace_product_code          = var.marketplace_product_code
   marketplace_camera_dimension      = var.marketplace_camera_dimension
+  marketplace_pricing_model         = var.marketplace_pricing_model
+  marketplace_free_camera_limit     = var.marketplace_free_camera_limit
   marketplace_entitlement_region    = var.marketplace_region
   marketplace_registration_page_url = var.marketplace_registration_page_url
   marketplace_seller_role_arn       = var.marketplace_seller_role_arn
@@ -123,6 +125,8 @@ module "compute" {
   task_memory                 = 512
   desired_count               = 1
   cors_origin                 = var.cors_origin
+  api_domain                  = var.api_domain
+  hosted_zone_name            = var.hosted_zone_name
 }
 
 # ---------------------------------------------------------------------------
@@ -137,10 +141,10 @@ module "lambda" {
   private_subnet_ids        = module.networking.private_subnet_ids
   lambda_sg_id              = module.networking.lambda_sg_id
   media_bucket_name         = module.storage.media_bucket_name
-  # Must be the HTTPS domain, not http://<alb-dns>: the ALB 301-redirects
-  # http→https and curl/fetch drop the POST body across a 301, so status/
-  # recording webhooks silently fail. Verified working: https://api.olympusvisions.com
-  internal_api_url = "https://api.olympusvisions.com"
+  # Use the public HTTPS URL so the Lambda skips the HTTP→HTTPS 301 redirect
+  # (fetch() won't re-POST across a redirect). Falls back to HTTP ALB DNS when
+  # no custom domain is configured.
+  internal_api_url = module.compute.api_url
   aws_account_id   = data.aws_caller_identity.current.account_id
 }
 

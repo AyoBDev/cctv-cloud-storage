@@ -56,3 +56,15 @@ variable "cors_origin" {
   description = "Allowed CORS origin for the API"
   type        = string
 }
+
+variable "api_domain" {
+  description = "Public DNS name for the API (e.g. api.olympusvisions.com). Empty string disables HTTPS/ACM/Route53 wiring and keeps the ALB HTTP-only."
+  type        = string
+  default     = ""
+}
+
+variable "hosted_zone_name" {
+  description = "Route 53 hosted zone the api_domain lives in (e.g. olympusvisions.com). Required when api_domain is set."
+  type        = string
+  default     = ""
+}

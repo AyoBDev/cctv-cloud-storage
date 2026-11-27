@@ -53,6 +53,23 @@ variable "marketplace_camera_dimension" {
   default     = "cameras"
 }
 
+variable "marketplace_pricing_model" {
+  description = "Pricing model of the listing: contract (camera entitlements) or free (fixed camera limit while the agreement is active)"
+  type        = string
+  default     = "contract"
+
+  validation {
+    condition     = contains(["contract", "free"], var.marketplace_pricing_model)
+    error_message = "marketplace_pricing_model must be contract or free."
+  }
+}
+
+variable "marketplace_free_camera_limit" {
+  description = "Cameras each buyer of a free listing may have"
+  type        = number
+  default     = 5
+}
+
 variable "marketplace_registration_page_url" {
   description = "Registration (fulfillment) URL configured on the listing"
   type        = string

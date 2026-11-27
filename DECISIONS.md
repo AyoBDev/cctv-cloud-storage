@@ -103,3 +103,29 @@ confirm the org's subscription status and camera limit on staging.
 **Decision:** Built-ins. The script and its helpers are under 500 lines with no new packages. The
 argument parsing and pass/fail logic are pure functions, unit tested in
 `tests/scripts/`.
+
+## 2026-11-27 — Support free AWS Marketplace listings
+
+**Context:** The staging listing turned out to use *Free pricing* (one externally
+metered `free_usage_default` dimension), not Contract. AWS does not allow changing
+a product's pricing model later. Free buyers have no entitlements, so with the
+contract logic they stayed `pending_activation` forever.
+
+**Options considered:**
+- **Switch the listing to Contract:** not possible in place ("You can't change the
+  pricing model later", AWS SaaS pricing models docs); would need a new product.
+- **Events only** (active on signup, cancelled on `Purchase Agreement Ended`): no
+  extra AWS call, but a lost event would leave access on forever.
+- **Agreement status from AWS** (`DescribeAgreement`, official SDK v3
+  `@aws-sdk/client-marketplace-agreement`, same SDK family): one more read-only
+  permission on the seller role; works with the existing event + hourly reconcile.
+
+**Decision:** Agreement status. A config switch (`MARKETPLACE_PRICING_MODEL`,
+`contract` or `free`) picks how access is read; contract listings are unchanged.
+Free buyers get `MARKETPLACE_FREE_CAMERA_LIMIT` cameras (default 5) while their
+agreement is `ACTIVE`. `Purchase Agreement Created` events move the customer to the
+newest agreement, so a buyer who cancels and subscribes again is checked correctly.
+
+**Open with AWS:** the docs do not say whether a free listing needs hourly
+zero-usage metering for its `free_usage_default` dimension; not built.
+

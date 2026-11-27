@@ -15,3 +15,15 @@ variable "ses_domain" {
   type        = string
   default     = ""
 }
+
+variable "api_domain" {
+  description = "Public DNS name for the API. Empty disables HTTPS/ACM/Route53 wiring."
+  type        = string
+  default     = "api.olympusvisions.com"
+}
+
+variable "hosted_zone_name" {
+  description = "Route 53 hosted zone that api_domain lives in."
+  type        = string
+  default     = "olympusvisions.com"
+}

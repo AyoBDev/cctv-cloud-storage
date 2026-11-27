@@ -80,9 +80,8 @@ export default async function marketplaceRoutes(app: FastifyInstance): Promise<v
       const customer = await syncCustomerEntitlement(
         app.db,
         app.redis,
-        app.marketplaceEntitlement,
+        app.marketplaceAccess,
         linked.customerId,
-        env.MARKETPLACE_CAMERA_DIMENSION,
       );
       return { organizationId: linked.organizationId, subscriptionStatus: customer.status };
     } catch (err) {

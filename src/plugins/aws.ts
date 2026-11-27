@@ -9,11 +9,13 @@ import { SESClient } from '@aws-sdk/client-ses';
 import { SNSClient } from '@aws-sdk/client-sns';
 import { MarketplaceMeteringClient } from '@aws-sdk/client-marketplace-metering';
 import { MarketplaceEntitlementServiceClient } from '@aws-sdk/client-marketplace-entitlement-service';
+import { MarketplaceAgreementClient } from '@aws-sdk/client-marketplace-agreement';
 import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { env } from '@config/env';
 import { setRekognitionClient } from '@services/rekognition.service';
 import { setS3Client } from '@services/s3.service';
 import { setSesClient } from '@services/ses.service';
+import { createMarketplaceAccessSource } from '@services/marketplace-access-source';
 
 const MARKETPLACE_ROLE_SESSION_NAME = 'olympusvisions-api-marketplace';
 
@@ -51,6 +53,16 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   const marketplaceEntitlement = new MarketplaceEntitlementServiceClient(
     marketplaceClientConfig(env.MARKETPLACE_ENTITLEMENT_REGION, env.MARKETPLACE_SELLER_ROLE_ARN),
   );
+  const marketplaceAgreement = new MarketplaceAgreementClient(
+    marketplaceClientConfig(env.MARKETPLACE_ENTITLEMENT_REGION, env.MARKETPLACE_SELLER_ROLE_ARN),
+  );
+  const marketplaceAccess = createMarketplaceAccessSource({
+    pricingModel: env.MARKETPLACE_PRICING_MODEL,
+    entitlementClient: marketplaceEntitlement,
+    agreementClient: marketplaceAgreement,
+    cameraDimension: env.MARKETPLACE_CAMERA_DIMENSION,
+    freeCameraLimit: env.MARKETPLACE_FREE_CAMERA_LIMIT,
+  });
 
   // Set clients on service modules
   setRekognitionClient(rekognition);
@@ -66,6 +78,8 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   app.decorate('sns', sns);
   app.decorate('marketplaceMetering', marketplaceMetering);
   app.decorate('marketplaceEntitlement', marketplaceEntitlement);
+  app.decorate('marketplaceAgreement', marketplaceAgreement);
+  app.decorate('marketplaceAccess', marketplaceAccess);
 
   app.addHook('onClose', async () => {
     kvs.destroy();
@@ -77,5 +91,6 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
     sns.destroy();
     marketplaceMetering.destroy();
     marketplaceEntitlement.destroy();
+    marketplaceAgreement.destroy();
   });
 });

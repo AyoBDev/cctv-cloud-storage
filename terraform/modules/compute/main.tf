@@ -98,9 +98,101 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
+  # When a custom HTTPS domain is configured, redirect all HTTP → HTTPS.
+  # Otherwise fall back to forwarding plain HTTP to the API (dev/no-domain).
+  dynamic "default_action" {
+    for_each = var.api_domain == "" ? [1] : []
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.api.arn
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = var.api_domain == "" ? [] : [1]
+    content {
+      type = "redirect"
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# HTTPS: ACM certificate (DNS-validated) + 443 listener + Route 53 alias
+# All gated on var.api_domain being set, so the module still applies without
+# a custom domain. DNS records live in the EXISTING hosted zone (looked up,
+# not created) so the working frontend zone is never touched.
+# ---------------------------------------------------------------------------
+data "aws_route53_zone" "public" {
+  count        = var.api_domain == "" ? 0 : 1
+  name         = var.hosted_zone_name
+  private_zone = false
+}
+
+resource "aws_acm_certificate" "api" {
+  count             = var.api_domain == "" ? 0 : 1
+  domain_name       = var.api_domain
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = { Name = "${var.project}-${var.environment}-api-cert" }
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = var.api_domain == "" ? {} : {
+    for dvo in aws_acm_certificate.api[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  zone_id         = data.aws_route53_zone.public[0].zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = [each.value.record]
+  ttl             = 60
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "api" {
+  count                   = var.api_domain == "" ? 0 : 1
+  certificate_arn         = aws_acm_certificate.api[0].arn
+  validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
+}
+
+resource "aws_lb_listener" "https" {
+  count             = var.api_domain == "" ? 0 : 1
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate_validation.api[0].certificate_arn
+
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.api.arn
+  }
+}
+
+# A-record alias: api.olympusvisions.com → ALB
+resource "aws_route53_record" "api" {
+  count   = var.api_domain == "" ? 0 : 1
+  zone_id = data.aws_route53_zone.public[0].zone_id
+  name    = var.api_domain
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.main.dns_name
+    zone_id                = aws_lb.main.zone_id
+    evaluate_target_health = true
   }
 }
 
@@ -141,6 +233,8 @@ resource "aws_ecs_task_definition" "api" {
       { name = "CORS_ORIGIN", value = var.cors_origin },
       { name = "MARKETPLACE_PRODUCT_CODE", value = var.marketplace_product_code },
       { name = "MARKETPLACE_CAMERA_DIMENSION", value = var.marketplace_camera_dimension },
+      { name = "MARKETPLACE_PRICING_MODEL", value = var.marketplace_pricing_model },
+      { name = "MARKETPLACE_FREE_CAMERA_LIMIT", value = tostring(var.marketplace_free_camera_limit) },
       { name = "MARKETPLACE_ENTITLEMENT_REGION", value = var.marketplace_entitlement_region },
       { name = "MARKETPLACE_REGISTRATION_PAGE_URL", value = var.marketplace_registration_page_url },
       { name = "MARKETPLACE_SELLER_ROLE_ARN", value = var.marketplace_seller_role_arn }
