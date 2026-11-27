@@ -235,6 +235,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "MARKETPLACE_CAMERA_DIMENSION", value = var.marketplace_camera_dimension },
       { name = "MARKETPLACE_PRICING_MODEL", value = var.marketplace_pricing_model },
       { name = "MARKETPLACE_FREE_CAMERA_LIMIT", value = tostring(var.marketplace_free_camera_limit) },
+      { name = "MARKETPLACE_FREE_ACCESS_CHECK", value = var.marketplace_free_access_check },
       { name = "MARKETPLACE_ENTITLEMENT_REGION", value = var.marketplace_entitlement_region },
       { name = "MARKETPLACE_REGISTRATION_PAGE_URL", value = var.marketplace_registration_page_url },
       { name = "MARKETPLACE_SELLER_ROLE_ARN", value = var.marketplace_seller_role_arn }

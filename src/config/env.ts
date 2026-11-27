@@ -10,6 +10,16 @@ import { z } from 'zod';
 export const MARKETPLACE_PRICING_MODELS = ['contract', 'free'] as const;
 export type MarketplacePricingModel = (typeof MARKETPLACE_PRICING_MODELS)[number];
 
+/**
+ * How a free listing decides whether a buyer still has access.
+ * - `events`: active until AWS sends `Purchase Agreement Ended` for their agreement.
+ *   Needs no extra permission, but relies on the events arriving.
+ * - `agreement`: asks AWS for the agreement status (DescribeAgreement). Needs
+ *   `aws-marketplace:DescribeAgreement` on the seller role.
+ */
+export const MARKETPLACE_FREE_ACCESS_CHECKS = ['events', 'agreement'] as const;
+export type MarketplaceFreeAccessCheck = (typeof MARKETPLACE_FREE_ACCESS_CHECKS)[number];
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -69,6 +79,7 @@ const envSchema = z.object({
   // MARKETPLACE_FREE_CAMERA_LIMIT cameras while their agreement is active.
   MARKETPLACE_PRICING_MODEL: z.enum(MARKETPLACE_PRICING_MODELS).default('contract'),
   MARKETPLACE_FREE_CAMERA_LIMIT: z.coerce.number().int().positive().default(5),
+  MARKETPLACE_FREE_ACCESS_CHECK: z.enum(MARKETPLACE_FREE_ACCESS_CHECKS).default('events'),
   MARKETPLACE_CAMERA_DIMENSION: z.string().default('cameras'),
   MARKETPLACE_ENTITLEMENT_REGION: z.string().default('us-east-1'),
   MARKETPLACE_REGISTRATION_PAGE_URL: z
