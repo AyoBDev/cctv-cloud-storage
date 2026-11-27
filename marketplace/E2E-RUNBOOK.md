@@ -82,6 +82,19 @@ Exit codes: `0` all checks passed, `1` an expectation did not match, `2` usage e
 
 Each step says what to do, what should happen, and how to confirm it.
 
+> **Free listing (staging today).** The staging listing uses *Free pricing*
+> (`marketplace_pricing_model = "free"`). AWS has no entitlements for free buyers, so
+> the API grants `marketplace_free_camera_limit` cameras (5) while the buyer's
+> agreement is `ACTIVE`, read with `DescribeAgreement`. For a free listing:
+> - **Step 1:** subscribe to the free listing; there is no camera count to choose.
+> - **Steps 2, 3 and 5:** use `--expect-limit 5`, and in step 3 add 5 cameras, then try a 6th.
+> - **Step 4:** skip it. A free agreement has nothing to upgrade.
+> - **Step 6:** unchanged. Cancelling the free subscription ends the agreement, so access stops.
+>
+> If the customer stays `pending_activation`, check the API logs for
+> `DescribeAgreement` `AccessDeniedException`: the seller role is missing
+> `aws-marketplace:DescribeAgreement`.
+
 ### Step 1: Subscribe to a small contract
 
 **Do:** signed in to the **test buyer** account `111122223333`, open the listing (or the

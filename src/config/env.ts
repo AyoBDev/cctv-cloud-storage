@@ -1,6 +1,15 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+/**
+ * How the AWS Marketplace listing is priced. AWS does not let a product change its
+ * pricing model, so this is fixed per product code.
+ * - `contract`: buyers buy a number of cameras; AWS reports it as an entitlement.
+ * - `free`: buyers pay nothing and AWS reports no entitlements, only the agreement.
+ */
+export const MARKETPLACE_PRICING_MODELS = ['contract', 'free'] as const;
+export type MarketplacePricingModel = (typeof MARKETPLACE_PRICING_MODELS)[number];
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -53,9 +62,13 @@ const envSchema = z.object({
   WEB_PUSH_VAPID_PRIVATE_KEY: z.string().default(''),
   WEB_PUSH_CONTACT_EMAIL: z.string().default(''),
 
-  // AWS Marketplace (SaaS contract). ResolveCustomer runs in AWS_REGION;
-  // the Entitlement Service is called in MARKETPLACE_ENTITLEMENT_REGION.
+  // AWS Marketplace (SaaS). ResolveCustomer runs in AWS_REGION; the Entitlement
+  // and Agreement services are called in MARKETPLACE_ENTITLEMENT_REGION.
   MARKETPLACE_PRODUCT_CODE: z.string().default(''),
+  // Must match the listing's pricing model. `free` listings give every buyer
+  // MARKETPLACE_FREE_CAMERA_LIMIT cameras while their agreement is active.
+  MARKETPLACE_PRICING_MODEL: z.enum(MARKETPLACE_PRICING_MODELS).default('contract'),
+  MARKETPLACE_FREE_CAMERA_LIMIT: z.coerce.number().int().positive().default(5),
   MARKETPLACE_CAMERA_DIMENSION: z.string().default('cameras'),
   MARKETPLACE_ENTITLEMENT_REGION: z.string().default('us-east-1'),
   MARKETPLACE_REGISTRATION_PAGE_URL: z

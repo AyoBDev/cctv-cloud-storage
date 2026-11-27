@@ -7,6 +7,7 @@ import {
   type MarketplaceEntitlementServiceClient,
 } from '@aws-sdk/client-marketplace-entitlement-service';
 import { AppError, ErrorCodes } from '@utils/errors';
+import type { MarketplaceAccessSource } from '@services/marketplace-access-source';
 
 /**
  * How long an org's access decision is cached. Every entitlement sync clears the
@@ -27,6 +28,7 @@ export interface MarketplaceCustomer {
   org_id: string;
   aws_account_id: string;
   product_code: string;
+  agreement_id: string | null;
   status: MarketplaceCustomerStatus;
   camera_limit: number;
   entitlement_expires_at: Date | null;
@@ -106,23 +108,17 @@ export function nextCustomerStatus(
 export async function syncCustomerEntitlement(
   db: Sql,
   redis: Redis,
-  client: MarketplaceEntitlementServiceClient,
+  access: MarketplaceAccessSource,
   customerId: string,
-  cameraDimension: string,
 ): Promise<MarketplaceCustomer> {
   const rows = await db<MarketplaceCustomer[]>`
-    SELECT id, org_id, aws_account_id, product_code, status, camera_limit, entitlement_expires_at
+    SELECT id, org_id, aws_account_id, product_code, agreement_id, status, camera_limit, entitlement_expires_at
     FROM marketplace_customers WHERE id = ${customerId}
   `;
   const customer = rows[0];
   if (!customer) throw new Error(`Marketplace customer ${customerId} not found`);
 
-  const entitlements = await fetchEntitlements(
-    client,
-    customer.product_code,
-    customer.aws_account_id,
-  );
-  const entitlement = pickCameraEntitlement(entitlements, cameraDimension, new Date());
+  const entitlement = await access.readCameraAllowance(customer, new Date());
   const status = nextCustomerStatus(customer.status, entitlement);
 
   const updated = await db<MarketplaceCustomer[]>`
@@ -133,7 +129,7 @@ export async function syncCustomerEntitlement(
         last_synced_at = now(),
         updated_at = now()
     WHERE id = ${customerId}
-    RETURNING id, org_id, aws_account_id, product_code, status, camera_limit, entitlement_expires_at
+    RETURNING id, org_id, aws_account_id, product_code, agreement_id, status, camera_limit, entitlement_expires_at
   `;
 
   const synced = updated[0] as MarketplaceCustomer;
@@ -164,12 +160,11 @@ export interface ReconcileResult {
 export async function reconcileAllCustomers(
   db: Sql,
   redis: Redis,
-  client: MarketplaceEntitlementServiceClient,
-  cameraDimension: string,
+  access: MarketplaceAccessSource,
   log: FastifyBaseLogger,
 ): Promise<ReconcileResult> {
   const customers = await db<MarketplaceCustomer[]>`
-    SELECT id, org_id, aws_account_id, product_code, status, camera_limit, entitlement_expires_at
+    SELECT id, org_id, aws_account_id, product_code, agreement_id, status, camera_limit, entitlement_expires_at
     FROM marketplace_customers
     ORDER BY created_at
   `;
@@ -178,7 +173,7 @@ export async function reconcileAllCustomers(
   for (const before of customers) {
     result.checked += 1;
     try {
-      const after = await syncCustomerEntitlement(db, redis, client, before.id, cameraDimension);
+      const after = await syncCustomerEntitlement(db, redis, access, before.id);
       if (hasEntitlementChanged(before, after)) {
         result.changed += 1;
         log.info(

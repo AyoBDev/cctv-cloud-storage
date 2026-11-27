@@ -47,7 +47,9 @@ resource "aws_iam_role_policy" "api_access" {
       Effect = "Allow"
       Action = [
         "aws-marketplace:ResolveCustomer",
-        "aws-marketplace:GetEntitlements"
+        "aws-marketplace:GetEntitlements",
+        # Free listings have no entitlements; access follows the agreement status.
+        "aws-marketplace:DescribeAgreement"
       ]
       Resource = "*"
     }]

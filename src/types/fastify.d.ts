@@ -10,6 +10,8 @@ import type { SESClient } from '@aws-sdk/client-ses';
 import type { SNSClient } from '@aws-sdk/client-sns';
 import type { MarketplaceMeteringClient } from '@aws-sdk/client-marketplace-metering';
 import type { MarketplaceEntitlementServiceClient } from '@aws-sdk/client-marketplace-entitlement-service';
+import type { MarketplaceAgreementClient } from '@aws-sdk/client-marketplace-agreement';
+import type { MarketplaceAccessSource } from '../services/marketplace-access-source';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -24,5 +26,8 @@ declare module 'fastify' {
     sns: SNSClient;
     marketplaceMetering: MarketplaceMeteringClient;
     marketplaceEntitlement: MarketplaceEntitlementServiceClient;
+    marketplaceAgreement: MarketplaceAgreementClient;
+    /** Decides a Marketplace customer's access for the listing's pricing model. */
+    marketplaceAccess: MarketplaceAccessSource;
   }
 }

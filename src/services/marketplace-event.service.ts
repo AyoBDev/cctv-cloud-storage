@@ -1,9 +1,9 @@
 import type { Sql } from 'postgres';
 import type { Redis } from 'ioredis';
 import type { FastifyBaseLogger } from 'fastify';
-import type { MarketplaceEntitlementServiceClient } from '@aws-sdk/client-marketplace-entitlement-service';
 import { AppError, ErrorCodes } from '@utils/errors';
 import { syncCustomerEntitlement } from '@services/entitlement.service';
+import type { MarketplaceAccessSource } from '@services/marketplace-access-source';
 
 /**
  * Agreement and license events that can change what a buyer is entitled to.
@@ -20,6 +20,9 @@ const ENTITLEMENT_EVENT_NAMES = [
   'Purchase Agreement Free Trial Converted',
 ] as const;
 const AGREEMENT_PARTIES = ['Manufacturer', 'Proposer'] as const;
+
+/** Starts a new agreement, e.g. a buyer who cancelled and then subscribed again. */
+const NEW_AGREEMENT_EVENT_NAME = 'Purchase Agreement Created';
 
 const ENTITLEMENT_DETAIL_TYPES: ReadonlySet<string> = new Set(
   ENTITLEMENT_EVENT_NAMES.flatMap((name) => AGREEMENT_PARTIES.map((party) => `${name} - ${party}`)),
@@ -46,6 +49,10 @@ export type MarketplaceEventOutcome = 'synced' | 'ignored' | 'no_customer' | 'al
 
 export function isEntitlementEvent(detailType: string): boolean {
   return ENTITLEMENT_DETAIL_TYPES.has(detailType);
+}
+
+export function isNewAgreementEvent(detailType: string): boolean {
+  return AGREEMENT_PARTIES.some((party) => detailType === `${NEW_AGREEMENT_EVENT_NAME} - ${party}`);
 }
 
 /** Stores the event once; reports whether an earlier delivery was already processed. */
@@ -76,6 +83,19 @@ async function findCustomerIdByAwsAccount(db: Sql, awsAccountId: string): Promis
   return rows[0]?.id ?? null;
 }
 
+/**
+ * A buyer who subscribes again gets a new agreement, and free listings check access
+ * by agreement, so the customer must follow the newest one. Only `Created` events
+ * move it: a late `Ended` event for the old agreement must not move it back.
+ */
+async function recordNewAgreement(db: Sql, customerId: string, agreementId: string): Promise<void> {
+  await db`
+    UPDATE marketplace_customers
+    SET agreement_id = ${agreementId}, updated_at = now()
+    WHERE id = ${customerId}
+  `;
+}
+
 async function markEventProcessed(db: Sql, eventId: string): Promise<void> {
   await db`
     UPDATE marketplace_events SET processed_at = now(), error = NULL WHERE event_id = ${eventId}
@@ -97,8 +117,7 @@ async function markEventFailed(db: Sql, eventId: string, err: unknown): Promise<
 export async function handleMarketplaceEvent(
   db: Sql,
   redis: Redis,
-  client: MarketplaceEntitlementServiceClient,
-  cameraDimension: string,
+  access: MarketplaceAccessSource,
   event: MarketplaceEvent,
   log: FastifyBaseLogger,
 ): Promise<MarketplaceEventOutcome> {
@@ -111,8 +130,12 @@ export async function handleMarketplaceEvent(
     : null;
   if (!customerId) return 'no_customer';
 
+  if (event.agreementId && isNewAgreementEvent(event.detailType)) {
+    await recordNewAgreement(db, customerId, event.agreementId);
+  }
+
   try {
-    await syncCustomerEntitlement(db, redis, client, customerId, cameraDimension);
+    await syncCustomerEntitlement(db, redis, access, customerId);
   } catch (err) {
     log.error({ err, eventId: event.eventId, customerId }, 'Marketplace event sync failed');
     await markEventFailed(db, event.eventId, err);

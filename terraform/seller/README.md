@@ -2,7 +2,7 @@
 
 The AWS Marketplace listing belongs to a **seller account** that is separate from the **app account**, where ECS and the Lambdas run. This stack runs in the seller account. It:
 
-1. Creates the `marketplace-api-access` role. Only the app's ECS task role can assume it. It allows only `aws-marketplace:ResolveCustomer` and `aws-marketplace:GetEntitlements`.
+1. Creates the `marketplace-api-access` role. Only the app's ECS task role can assume it. It allows only `aws-marketplace:ResolveCustomer`, `aws-marketplace:GetEntitlements` and `aws-marketplace:DescribeAgreement` (free listings have no entitlements, so access follows the agreement status).
 2. Adds an EventBridge rule in `us-east-1` that forwards the listing's agreement and license events to the app account's `us-east-1` default event bus. From there the app stack sends them on to the API.
 
 ```

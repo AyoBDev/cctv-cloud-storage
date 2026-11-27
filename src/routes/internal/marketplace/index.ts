@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { env } from '@config/env';
 import { requireInternalSecret } from '@middleware/require-internal-secret';
 import { reconcileAllCustomers } from '@services/entitlement.service';
 import { handleMarketplaceEvent, type MarketplaceEvent } from '@services/marketplace-event.service';
@@ -74,8 +73,7 @@ export default async function internalMarketplaceRoutes(app: FastifyInstance): P
       const outcome = await handleMarketplaceEvent(
         app.db,
         app.redis,
-        app.marketplaceEntitlement,
-        env.MARKETPLACE_CAMERA_DIMENSION,
+        app.marketplaceAccess,
         event,
         request.log,
       );
@@ -101,13 +99,6 @@ export default async function internalMarketplaceRoutes(app: FastifyInstance): P
         },
       },
     },
-    async (request) =>
-      reconcileAllCustomers(
-        app.db,
-        app.redis,
-        app.marketplaceEntitlement,
-        env.MARKETPLACE_CAMERA_DIMENSION,
-        request.log,
-      ),
+    async (request) => reconcileAllCustomers(app.db, app.redis, app.marketplaceAccess, request.log),
   );
 }
