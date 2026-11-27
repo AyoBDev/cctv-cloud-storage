@@ -58,6 +58,8 @@ export default fp(async function awsPlugin(app: FastifyInstance) {
   );
   const marketplaceAccess = createMarketplaceAccessSource({
     pricingModel: env.MARKETPLACE_PRICING_MODEL,
+    freeAccessCheck: env.MARKETPLACE_FREE_ACCESS_CHECK,
+    db: app.db,
     entitlementClient: marketplaceEntitlement,
     agreementClient: marketplaceAgreement,
     cameraDimension: env.MARKETPLACE_CAMERA_DIMENSION,

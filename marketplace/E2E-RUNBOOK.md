@@ -84,16 +84,24 @@ Each step says what to do, what should happen, and how to confirm it.
 
 > **Free listing (staging today).** The staging listing uses *Free pricing*
 > (`marketplace_pricing_model = "free"`). AWS has no entitlements for free buyers, so
-> the API grants `marketplace_free_camera_limit` cameras (5) while the buyer's
-> agreement is `ACTIVE`, read with `DescribeAgreement`. For a free listing:
+> the API grants `marketplace_free_camera_limit` cameras (5) until the buyer's
+> agreement ends. How it knows depends on `marketplace_free_access_check`:
+> - `events` (staging today): active from signup until a `Purchase Agreement Ended`
+>   event arrives for the buyer's agreement. **The seller account's event forwarding
+>   rule must exist**, or cancellations are never seen.
+> - `agreement`: asks AWS with `DescribeAgreement` on every event and hourly check.
+>   Needs `aws-marketplace:DescribeAgreement` on the seller role.
+>
+> For a free listing:
 > - **Step 1:** subscribe to the free listing; there is no camera count to choose.
 > - **Steps 2, 3 and 5:** use `--expect-limit 5`, and in step 3 add 5 cameras, then try a 6th.
 > - **Step 4:** skip it. A free agreement has nothing to upgrade.
 > - **Step 6:** unchanged. Cancelling the free subscription ends the agreement, so access stops.
 >
-> If the customer stays `pending_activation`, check the API logs for
-> `DescribeAgreement` `AccessDeniedException`: the seller role is missing
-> `aws-marketplace:DescribeAgreement`.
+> In `agreement` mode, if the customer stays `pending_activation`, check the API logs
+> for `DescribeAgreement` `AccessDeniedException`: the seller role is missing
+> `aws-marketplace:DescribeAgreement`. In `events` mode, if a cancelled buyer still has
+> access, check that a `Purchase Agreement Ended` row reached `marketplace_events`.
 
 ### Step 1: Subscribe to a small contract
 

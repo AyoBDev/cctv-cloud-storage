@@ -7,11 +7,12 @@ import {
   GetEntitlementsCommand,
   MarketplaceEntitlementServiceClient,
 } from '@aws-sdk/client-marketplace-entitlement-service';
+import type { Sql } from 'postgres';
 import type { MarketplaceCustomer } from '../../src/services/entitlement.service';
 import {
   contractAccessSource,
   createMarketplaceAccessSource,
-  freeAccessSource,
+  freeAccessFromAgreementStatus,
 } from '../../src/services/marketplace-access-source';
 
 const agreementMock = mockClient(MarketplaceAgreementClient);
@@ -42,8 +43,9 @@ beforeEach(() => {
   entitlementMock.reset();
 });
 
-describe('freeAccessSource', () => {
-  const source = () => freeAccessSource(new MarketplaceAgreementClient({}), FREE_CAMERA_LIMIT);
+describe('freeAccessFromAgreementStatus', () => {
+  const source = () =>
+    freeAccessFromAgreementStatus(new MarketplaceAgreementClient({}), FREE_CAMERA_LIMIT);
 
   it('gives the free camera limit, with no end date, while the agreement is ACTIVE', async () => {
     agreementMock.on(DescribeAgreementCommand).resolves({ status: 'ACTIVE' });
@@ -106,35 +108,58 @@ describe('contractAccessSource', () => {
 });
 
 describe('createMarketplaceAccessSource', () => {
-  const options = (pricingModel: 'contract' | 'free') => ({
+  /** Stands in for the database: every query finds no rows (no `Ended` events). */
+  const queries: unknown[] = [];
+  const noRowsDb = ((...args: unknown[]) => {
+    queries.push(args);
+    return Promise.resolve([]);
+  }) as unknown as Sql;
+
+  const options = (pricingModel: 'contract' | 'free', freeAccessCheck: 'events' | 'agreement') => ({
     pricingModel,
+    freeAccessCheck,
+    db: noRowsDb,
     entitlementClient: new MarketplaceEntitlementServiceClient({}),
     agreementClient: new MarketplaceAgreementClient({}),
     cameraDimension: CAMERA_DIMENSION,
     freeCameraLimit: FREE_CAMERA_LIMIT,
   });
 
-  it('uses the agreement for free listings', async () => {
+  beforeEach(() => {
+    queries.length = 0;
+  });
+
+  it('uses stored events, and no AWS call, for free listings in events mode', async () => {
+    const allowance = await createMarketplaceAccessSource(
+      options('free', 'events'),
+    ).readCameraAllowance(customer(), NOW);
+
+    expect(allowance).toEqual({ cameraLimit: FREE_CAMERA_LIMIT, expiresAt: null });
+    expect(queries.length).toBeGreaterThan(0);
+    expect(agreementMock.commandCalls(DescribeAgreementCommand)).toHaveLength(0);
+    expect(entitlementMock.commandCalls(GetEntitlementsCommand)).toHaveLength(0);
+  });
+
+  it('uses the agreement status for free listings in agreement mode', async () => {
     agreementMock.on(DescribeAgreementCommand).resolves({ status: 'ACTIVE' });
 
-    const allowance = await createMarketplaceAccessSource(options('free')).readCameraAllowance(
-      customer(),
-      NOW,
-    );
+    const allowance = await createMarketplaceAccessSource(
+      options('free', 'agreement'),
+    ).readCameraAllowance(customer(), NOW);
 
     expect(allowance?.cameraLimit).toBe(FREE_CAMERA_LIMIT);
     expect(entitlementMock.commandCalls(GetEntitlementsCommand)).toHaveLength(0);
   });
 
-  it('uses entitlements for contract listings', async () => {
+  it('uses entitlements for contract listings, whatever the free check is', async () => {
     entitlementMock.on(GetEntitlementsCommand).resolves({ Entitlements: [] });
 
-    const allowance = await createMarketplaceAccessSource(options('contract')).readCameraAllowance(
-      customer(),
-      NOW,
-    );
+    const allowance = await createMarketplaceAccessSource(
+      options('contract', 'events'),
+    ).readCameraAllowance(customer(), NOW);
 
     expect(allowance).toBeNull();
+    expect(queries).toHaveLength(0);
     expect(agreementMock.commandCalls(DescribeAgreementCommand)).toHaveLength(0);
   });
 });

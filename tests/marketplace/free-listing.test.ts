@@ -16,7 +16,10 @@ import {
   signUpMarketplaceOrg,
 } from '../helpers/marketplace';
 import { syncCustomerEntitlement } from '../../src/services/entitlement.service';
-import { freeAccessSource } from '../../src/services/marketplace-access-source';
+import {
+  freeAccessFromAgreementStatus,
+  freeAccessFromEvents,
+} from '../../src/services/marketplace-access-source';
 
 const meteringMock = mockClient(MarketplaceMeteringClient);
 const entitlementMock = mockClient(MarketplaceEntitlementServiceClient);
@@ -65,8 +68,60 @@ describe('AWS Marketplace free listings', () => {
   }
 
   function freeAccess() {
-    return freeAccessSource(new MarketplaceAgreementClient({}), FREE_CAMERA_LIMIT);
+    return freeAccessFromAgreementStatus(new MarketplaceAgreementClient({}), FREE_CAMERA_LIMIT);
   }
+
+  function freeAccessFromStoredEvents() {
+    return freeAccessFromEvents(app.db, FREE_CAMERA_LIMIT);
+  }
+
+  describe('events mode (no DescribeAgreement permission)', () => {
+    it('activates a new buyer straight away, then cancels them when their agreement ends', async () => {
+      const awsAccountId = placeholderAwsAccountId();
+      const org = await signUpMarketplaceOrg(app, meteringMock, awsAccountId, 'events-free');
+      const { id, agreement_id } = await customerOf(org.orgId);
+
+      const active = await syncCustomerEntitlement(
+        app.db,
+        app.redis,
+        freeAccessFromStoredEvents(),
+        id,
+      );
+      expect(active).toMatchObject({ status: 'active', camera_limit: FREE_CAMERA_LIMIT });
+
+      await postEvent(app, marketplaceEvent(ENDED, { awsAccountId, agreementId: agreement_id! }));
+      const cancelled = await syncCustomerEntitlement(
+        app.db,
+        app.redis,
+        freeAccessFromStoredEvents(),
+        id,
+      );
+      expect(cancelled).toMatchObject({ status: 'cancelled', camera_limit: 0 });
+      expect(agreementMock.commandCalls(DescribeAgreementCommand)).toHaveLength(0);
+    });
+
+    it('reactivates a buyer who subscribes again, even if the old agreement ends later', async () => {
+      const awsAccountId = placeholderAwsAccountId();
+      const org = await signUpMarketplaceOrg(app, meteringMock, awsAccountId, 'events-resub');
+      const { id, agreement_id: oldAgreementId } = await customerOf(org.orgId);
+      await postEvent(app, marketplaceEvent(ENDED, { awsAccountId, agreementId: oldAgreementId! }));
+
+      // New subscription, then a late duplicate of the old agreement's Ended event.
+      await postEvent(
+        app,
+        marketplaceEvent(CREATED, { awsAccountId, agreementId: placeholderAgreementId() }),
+      );
+      await postEvent(app, marketplaceEvent(ENDED, { awsAccountId, agreementId: oldAgreementId! }));
+
+      const synced = await syncCustomerEntitlement(
+        app.db,
+        app.redis,
+        freeAccessFromStoredEvents(),
+        id,
+      );
+      expect(synced).toMatchObject({ status: 'active', camera_limit: FREE_CAMERA_LIMIT });
+    });
+  });
 
   it('activates a free buyer with the free camera limit, then cancels them when the agreement ends', async () => {
     const org = await signUpMarketplaceOrg(app, meteringMock, placeholderAwsAccountId(), 'free');

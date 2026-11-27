@@ -129,3 +129,18 @@ newest agreement, so a buyer who cancels and subscribes again is checked correct
 **Open with AWS:** the docs do not say whether a free listing needs hourly
 zero-usage metering for its `free_usage_default` dimension; not built.
 
+## 2026-11-27 — Free listings: events-only check first
+
+**Context:** The seller role does not have `aws-marketplace:DescribeAgreement` yet,
+and we want to test without waiting for it.
+
+**Decision:** Add `MARKETPLACE_FREE_ACCESS_CHECK` (`events` | `agreement`), default
+`events`. In `events` mode a free buyer is active from signup (AWS only issues a
+registration token right after a subscription) until a `Purchase Agreement Ended`
+event is stored for their current agreement. Switching to `agreement` later is a
+config change plus the role permission; no code change.
+
+**Trade-off accepted:** nothing re-checks with AWS in `events` mode, so a lost
+`Ended` event leaves access on. The DLQ alarm is the only signal. The seller
+account's event forwarding rule is therefore required before real buyers.
+

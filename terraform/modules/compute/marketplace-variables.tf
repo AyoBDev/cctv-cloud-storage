@@ -30,6 +30,17 @@ variable "marketplace_free_camera_limit" {
   default     = 5
 }
 
+variable "marketplace_free_access_check" {
+  description = "Free listings only: 'events' (active until a Purchase Agreement Ended event; no extra permission) or 'agreement' (DescribeAgreement; needs that permission on the seller role)"
+  type        = string
+  default     = "events"
+
+  validation {
+    condition     = contains(["events", "agreement"], var.marketplace_free_access_check)
+    error_message = "marketplace_free_access_check must be events or agreement."
+  }
+}
+
 variable "marketplace_entitlement_region" {
   description = "Region of the AWS Marketplace Entitlement/Metering APIs"
   type        = string

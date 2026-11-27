@@ -23,6 +23,13 @@ const AGREEMENT_PARTIES = ['Manufacturer', 'Proposer'] as const;
 
 /** Starts a new agreement, e.g. a buyer who cancelled and then subscribed again. */
 const NEW_AGREEMENT_EVENT_NAME = 'Purchase Agreement Created';
+/** Sent when an agreement is cancelled, expires or is terminated. */
+const AGREEMENT_ENDED_EVENT_NAME = 'Purchase Agreement Ended';
+
+/** Every detail type AWS uses for "this agreement has ended". */
+export const AGREEMENT_ENDED_DETAIL_TYPES: readonly string[] = AGREEMENT_PARTIES.map(
+  (party) => `${AGREEMENT_ENDED_EVENT_NAME} - ${party}`,
+);
 
 const ENTITLEMENT_DETAIL_TYPES: ReadonlySet<string> = new Set(
   ENTITLEMENT_EVENT_NAMES.flatMap((name) => AGREEMENT_PARTIES.map((party) => `${name} - ${party}`)),

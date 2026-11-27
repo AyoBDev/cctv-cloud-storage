@@ -10,3 +10,5 @@ marketplace_product_code      = "ceocu3is6rfd8vo9zsr9gzcvz"
 # The listing uses Free pricing (AWS does not allow changing it later).
 marketplace_pricing_model     = "free"
 marketplace_free_camera_limit = 5
+# "events" until the seller role has aws-marketplace:DescribeAgreement; then "agreement".
+marketplace_free_access_check = "events"

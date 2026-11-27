@@ -108,6 +108,7 @@ module "compute" {
   marketplace_camera_dimension      = var.marketplace_camera_dimension
   marketplace_pricing_model         = var.marketplace_pricing_model
   marketplace_free_camera_limit     = var.marketplace_free_camera_limit
+  marketplace_free_access_check     = var.marketplace_free_access_check
   marketplace_entitlement_region    = var.marketplace_region
   marketplace_registration_page_url = var.marketplace_registration_page_url
   marketplace_seller_role_arn       = var.marketplace_seller_role_arn
