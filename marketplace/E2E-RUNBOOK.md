@@ -87,8 +87,9 @@ Each step says what to do, what should happen, and how to confirm it.
 > the API grants `marketplace_free_camera_limit` cameras (5) until the buyer's
 > agreement ends. How it knows depends on `marketplace_free_access_check`:
 > - `events` (staging today): active from signup until a `Purchase Agreement Ended`
->   event arrives for the buyer's agreement. **The seller account's event forwarding
->   rule must exist**, or cancellations are never seen.
+>   event arrives for the buyer's agreement. Steps 1–3 work without the seller
+>   account's event forwarding rule. **Steps 5–6 (reconcile, cancel) need it**:
+>   without it, cancellations are never seen.
 > - `agreement`: asks AWS with `DescribeAgreement` on every event and hourly check.
 >   Needs `aws-marketplace:DescribeAgreement` on the seller role.
 >
